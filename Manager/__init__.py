@@ -77,7 +77,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
         render_row.operator(RenderAnimatonOperator.bl_idname,
                             text=RenderAnimatonOperator.bl_label,
                             icon="FILE_MOVIE")
-        # render_setting.enabled = scene.RenderSettingEnable
+        render_setting.enabled = scene.RenderSettingEnable
 
 
 class StartServerOperator(bpy.types.Operator):

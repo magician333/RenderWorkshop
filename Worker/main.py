@@ -68,7 +68,7 @@ class Client:
 
 if __name__ == "__main__":
     print("RenderWorkShop [worker] is running...")
-    with open("config.json", "r") as f:
+    with open("./config.json", "r") as f:
         config_data = json.loads(f.read())
         print(f"[Info] Reading config file")
         server_ip = config_data["server_ip"]
