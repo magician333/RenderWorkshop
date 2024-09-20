@@ -1,3 +1,4 @@
+import os
 import socket
 import json
 import subprocess
@@ -40,7 +41,13 @@ class Client:
                     self.flag = True
                     self.sock.send("ok".encode("utf-8"))
                 elif data["flag"] == "render":
-                    tmp_filename = str(time.time()) + ".png"
+                    blend_file_path = os.path.dirname(self.blend_file)
+                    temp_path = blend_file_path + "/temp"
+                    
+                    if not os.path.isdir(temp_path):
+                        os.mkdir(temp_path)
+                    key_time = str(time.time())
+                    temp_filename = temp_path + "/" + key_time + ".png"
                     if self.flag:
                         command = [
                             blender_path, "-b", "--python", "./render.py",
@@ -49,19 +56,11 @@ class Client:
                             str(self.border[1]),
                             str(self.border[2]),
                             str(self.border[3]), "--frame_number",
-                            str(self.frame), "--render_path",
-                            render_path + tmp_filename
+                            str(self.frame), "--save_path", temp_filename
                         ]
                         result = subprocess.run(command)
                         if result.returncode == 0:
-                            # self.sock.sendall(b'file_transfer:')
-                            # with open(render_path + tmp_filename, "rb") as f:
-                            #     data = f.read(1024)
-                            #     while data:
-                            #         self.sock.sendall(data)
-                            #         data = f.read(1024)
-                            self.sock.send("ok".encode("utf-8"))
-                            # print("Send image complete")
+                            self.sock.send((key_time + ".png").encode("utf-8"))
         except Exception as e:
             print(f"[Error] recv data error:{e}")
 
@@ -77,8 +76,6 @@ if __name__ == "__main__":
         print(f"[Info] server port:{server_port}")
         blender_path = r'{}'.format(config_data["blender_path"])
         print(f"[Info] blender path:{blender_path}")
-        render_path = r'{}'.format(config_data["render_path"])
-        print(f"[Info] redner path:{render_path}")
 
     client = Client(server_addr=server_ip, port=server_port)
     client.runclient()

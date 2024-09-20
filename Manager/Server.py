@@ -89,7 +89,6 @@ class Server:
         except Exception as e:
             print(f"[Error] recv data error:{e}")
 
-
     def recv_file(self, addr):
         try:
             conn = self.conn_list[addr]

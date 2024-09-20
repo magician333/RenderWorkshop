@@ -40,8 +40,7 @@ Image sequence rendering has two modes
  - [x] manger and worker socket communication
  - [x] manger slicing and task distribution
  - [x] worker image return
- - [ ] manager image receiving
- - [ ] manager image stitching and display
+ - [x] manager merge image
  - [ ] manger automatically shares blend files (if possible)
  - [ ] image sequence rendering (partitioned rendering)
  - [ ] image sequence rendering (multi-frame rendering)

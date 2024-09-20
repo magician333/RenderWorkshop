@@ -24,6 +24,7 @@ bl_info = {
 }
 
 import json
+import os
 import threading
 import bpy
 import socket
@@ -200,8 +201,11 @@ class RenderImageOperator(bpy.types.Operator):
                 "blendfile": item.blendfile.strip('"')
             }
             workerlist.append(worker)
+            bpy.ops.wm.window_new()
+            area = bpy.context.window_manager.windows[-1].screen.areas[0]
+            area.ui_type = 'IMAGE_EDITOR'
 
-            utils.manage_threads(server, tasklist, workerlist)
+            utils.manage_threads(server, area, tasklist, workerlist)
 
         return {'FINISHED'}
 
@@ -210,9 +214,7 @@ class RenderAnimatonOperator(bpy.types.Operator):
     bl_idname = "render.render_animation"
     bl_label = "Render Animation"
 
-
     def execute(self, context):
-
 
         return {'FINISHED'}
 

@@ -38,8 +38,7 @@ worker负责渲染manager分发的区域渲染任务，并在渲染完成后将�
  - [x] manger和worker socket通信
  - [x] manger切片及任务分发
  - [x] worker图像回传
- - [ ] manager图像接收
- - [ ] manager图像拼接及展示
+ - [x] manager图像拼接及展示
  - [ ] manger自动共享blend文件（如果可行）
  - [ ] 图像序列渲染（分区渲染）
  - [ ] 图像序列渲染（多帧渲染）
