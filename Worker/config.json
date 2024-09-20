@@ -1,0 +1,6 @@
+{
+  "server_ip": "192.168.0.56",
+  "server_port": 9881,
+  "blender_path": "C:\\Program Files\\Blender Foundation\\Blender 4.2\\blender.exe",
+  "render_path": "C:\\workshop\\"
+}
