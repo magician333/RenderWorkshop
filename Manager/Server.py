@@ -65,9 +65,6 @@ class Server:
                     data = conn.recv(1024)
                     if not data:
                         break
-
-                    if data.startswith(b'file_transfer:'):
-                        self.recv_file(addr)
                     else:
                         print(data)
                 except Exception as e:
@@ -88,27 +85,6 @@ class Server:
             return data.decode("utf-8")
         except Exception as e:
             print(f"[Error] recv data error:{e}")
-
-    def recv_file(self, addr):
-        try:
-            conn = self.conn_list[addr]
-            file_path = os.path.join("/tmp/", str(time.time()) + ".png")
-
-            try:
-                with open(file_path, 'wb') as f:
-                    while True:
-                        data = conn.recv(1024)
-                        if not data:
-                            break
-                        f.write(data)
-                print(f"File received and saved to: {file_path}")
-            except OSError as e:
-                print(f"[Error] Error writing file: {e}")
-
-        except KeyError:
-            print(f"[Error] Connection for address {addr} not found.")
-        except Exception as e:
-            print(f"[Error] Error receiving file: {e}")
 
     def stop_server(self):
         context = bpy.context

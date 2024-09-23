@@ -1,12 +1,17 @@
 # RenderWorkshop
-
-RenderWorkshop is a distributed rendering tool for blender,currently under development
+![logo](./img/logo.png)
+**RenderWorkshop** is an open source, free distributed rendering tool for [Blender](https://www.blender.org/) that renders single frame images/image sequences using multiple devices, dramatically speeding up rendering, especially for small studios/companies/personal intranet environments with multiple devices.
 
 [中文文档](./README_zh.md)
 
-![manager](./img/manager.png)
-![manager-render](./img/manager-render.png)
+Pictures
+---
+![manager](./img/Image.png)
+
+![manager-render](./img/Animation.png)
+
 ![worker](./img/worker.png)
+
 
 How to use
 ---
@@ -42,12 +47,16 @@ Image sequence rendering has two modes
  - [x] worker image return
  - [x] manager merge image
  - [ ] manger automatically shares blend files (if possible)
- - [ ] image sequence rendering (partitioned rendering)
- - [ ] image sequence rendering (multi-frame rendering)
+ - [ ] animation rendering (partitioned rendering)
+ - [ ] animation rendering (multi-frame rendering)
  - [ ] worker file packing executable
  - [ ] worker online status feedback
- - [ ] Interface UI active refresh (current UI will not be actively refreshed, you need to move the mouse, etc. to refresh)
- - [ ] Multi-platform blender test (currently based on Windows)
- - [ ] Multi-version blender rendering test (currently based on blender 4.2.1)
+ - [ ] UI active refresh (current UI will not be actively refreshed, you need to move the mouse, etc. to refresh)
+ - [ ] multi-platform blender test (currently based on Windows)
+ - [ ] multi-version blender rendering test (currently based on blender 4.2.1)
  - [ ] Code Optimisation
- - [ ] Multi-language support
+ - [ ] multi-language support
+  
+Other
+---
+This project references [CrowdRender](https://www.crowd-render.com/), [BlendFarm](https://github.com/LogicReinc/LogicReinc.BlendFarm), [Flamenco]( https://flamenco.blender.org/) and other projects thoughts and ideas, the project is still under development and improvement, welcome to try and put forward your comments and suggestions to issue or send mail to [magician33333@gmail.com](magician33333@gmail.com)

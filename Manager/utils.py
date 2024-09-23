@@ -130,7 +130,8 @@ def merge_image(area):
     bpy.context.scene.use_nodes = False
     image = bpy.data.images.load(composite_file_path)
     area.spaces.active.image = image
-    shutil.rmtree(tempfilepath)
+    if scene.DelCache:
+        shutil.rmtree(tempfilepath)
 
 
 def run_task(server, area, task, worker):

@@ -1,10 +1,16 @@
 # RenderWorkshop
-RenderWorkshop 是 blender 的分布式渲染工具，目前正在开发中。
+![logo](./img/logo.png)
 
+**RenderWorkshop** 是适用于 [Blender](https://www.blender.org/) 的开源免费的分布式渲染工具，使用多台设备渲染单帧图像/图像序列，大幅加快渲染速度，尤其适用于拥有多设备的小型工作室/公司/个人内网环境。
+
+图片
+---
 [English Docs](./README.md)
 
-![manager](./img/manager.png)
-![manager-render](./img/manager-render.png)
+![manager](./img/Image.png)
+
+![manager-render](./img/Animation.png)
+
 ![worker](./img/worker.png)
 
 如何使用
@@ -32,7 +38,9 @@ worker负责渲染manager分发的区域渲染任务，并在渲染完成后将�
 1. 您可以选择与图像相同的切片渲染模式，即每一帧都分配给所有worker进行渲染（在渲染下一帧之前，先渲染当前帧）
 2. 您可以选择为不同的worker设置不同的帧范围，类似于 [Flamenco](https://flamenco.blender.org/)。
 
-### 开发进度
+
+开发进度
+---
  - [x] manager基本框架
  - [x] worker程序及渲染文件
  - [x] manger和worker socket通信
@@ -40,8 +48,8 @@ worker负责渲染manager分发的区域渲染任务，并在渲染完成后将�
  - [x] worker图像回传
  - [x] manager图像拼接及展示
  - [ ] manger自动共享blend文件（如果可行）
- - [ ] 图像序列渲染（分区渲染）
- - [ ] 图像序列渲染（多帧渲染）
+ - [ ] 动画渲染（分区渲染）
+ - [ ] 动画渲染（多帧渲染）
  - [ ] worker文件打包可执行文件
  - [ ] worker在线状态反馈
  - [ ] 界面UI主动刷新（当前UI界面不会主动刷新，需要移动鼠标等方式进行刷新）
@@ -49,3 +57,8 @@ worker负责渲染manager分发的区域渲染任务，并在渲染完成后将�
  - [ ] 多版本blender渲染测试（当前基于blender4.2.1）
  - [ ] 代码优化
  - [ ] 多语言支持
+
+
+其他
+---
+该项目参考了[CrowdRender](https://www.crowd-render.com/)、[BlendFarm](https://github.com/LogicReinc/LogicReinc.BlendFarm)、[Flamenco](https://flamenco.blender.org/)等项目的思路和想法，该项目还在开发完善中，欢迎尝试并提出您的意见和建议至issue或发送邮件至[magician33333@gmail.com](magician33333@gmail.com)

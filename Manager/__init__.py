@@ -23,7 +23,6 @@ bl_info = {
     "category": "Generic",
 }
 
-import json
 import threading
 import bpy
 import socket
@@ -53,7 +52,6 @@ class RenderWorkshopMenu(bpy.types.Panel):
         ip = socket.gethostbyname(hostname)
         net_row.label(text="Local IP: " + ip)
         net_row.label(text="Port: " + str(context.scene.ServerPort))
-
         server_box.label(text=context.scene.ServerStatus)
         layout.separator()
         layout.template_list("WorkerItemList",
@@ -63,19 +61,48 @@ class RenderWorkshopMenu(bpy.types.Panel):
                              scene,
                              "Workers_index",
                              type="DEFAULT")
-        render_setting = layout.column()
-        render_setting.prop(scene, "Tiles", text="Tile Split")
-        frame_row = render_setting.row(align=True)
-        frame_row.prop(scene, "FrameStart", text="Frame Start")
-        frame_row.prop(scene, "FrameEnd", text="Frame End")
+        tab = layout.column().box()
+        tabrow = tab.row()
+        tabs = tabrow.row()
+        tabs.prop(context.scene, "TabIndex", expand=True)
 
-        render_row = render_setting.row()
-        render_row.operator(RenderImageOperator.bl_idname,
-                            text=RenderImageOperator.bl_label,
-                            icon="FILE_IMAGE")
-        render_row.operator(RenderAnimatonOperator.bl_idname,
-                            text=RenderAnimatonOperator.bl_label,
-                            icon="FILE_MOVIE")
+        if scene.TabIndex == "Image":
+            render_setting = tab.column()
+
+            render_setting.prop(scene, "Tiles", text="Tile Split")
+            render_setting.separator()
+            render_setting.prop(scene,
+                                "DelCache",
+                                text="Delete the tiles cache")
+            render_setting.separator()
+            render_setting.operator(RenderImageOperator.bl_idname,
+                                    text=RenderImageOperator.bl_label,
+                                    icon="FILE_IMAGE")
+
+        elif scene.TabIndex == "Animation":
+            render_setting = tab.column()
+            animation_tab = render_setting.column()
+            animation_tab_row = animation_tab.row()
+            animation_tabs = animation_tab_row.row()
+            animation_tabs.alignment = "CENTER"
+
+            animation_tabs.prop(scene, "AnimationFun", text="Render Method")
+
+            if scene.AnimationFun == "Frames":
+                render_setting.separator()
+                render_setting.prop(scene, "Frames", text="Frame Split")
+            elif scene.AnimationFun == "Tiles":
+                render_setting.separator()
+                render_setting.prop(scene, "Tiles", text="Tile Split")
+            render_setting.separator()
+            frame_row = render_setting.row()
+
+            frame_row.prop(scene, "FrameStart", text="Frame Start")
+            frame_row.prop(scene, "FrameEnd", text="Frame End")
+            render_setting.separator()
+            render_setting.operator(RenderAnimatonOperator.bl_idname,
+                                    text=RenderAnimatonOperator.bl_label,
+                                    icon="FILE_MOVIE")
         render_setting.enabled = scene.RenderSettingEnable
 
 
@@ -108,9 +135,7 @@ class StartServerOperator(bpy.types.Operator):
 class WorkerItem(bpy.types.PropertyGroup):
 
     host: bpy.props.StringProperty(name="Host")  # type: ignore
-    status: bpy.props.StringProperty(name="Connection Status",
-                                     get=lambda self: "Connected",
-                                     options={'HIDDEN'})  # type: ignore
+
     blendfile: bpy.props.StringProperty(name="blendfile")  # type: ignore
 
 
@@ -121,33 +146,9 @@ class WorkerItemList(bpy.types.UIList):
         row = layout.row(align=True)
         row.label(text=item.host)
         row.prop(item, "blendfile", text="")
-        row.operator(SyncDataOperator.bl_idname,
-                     icon="KEYTYPE_JITTER_VEC",
-                     text="").index = index
+
         row.operator(DeleteHostOperator.bl_idname, text="",
                      icon='X').index = index
-
-
-class SyncDataOperator(bpy.types.Operator):
-    bl_idname = "render.verify"
-    bl_label = "Verify"
-
-    index: bpy.props.IntProperty()  # type: ignore
-
-    def execute(self, context):
-        scene = context.scene
-        render_item = scene.Workers[self.index]
-        borders = utils.getborders(context.scene.Tiles)
-        send_data = {
-            "flag": "sync",
-            "blend_file": render_item.blendfile,
-            "scene": bpy.context.scene.name,
-            "border": borders[0],
-            "frame": 1
-        }
-        server.send_data(
-            json.dumps(send_data).encode("utf-8"), render_item.host)
-        return {'FINISHED'}
 
 
 class DeleteHostOperator(bpy.types.Operator):
@@ -218,7 +219,6 @@ def register():
     bpy.utils.register_class(DeleteHostOperator)
     bpy.utils.register_class(RenderImageOperator)
     bpy.utils.register_class(RenderAnimatonOperator)
-    bpy.utils.register_class(SyncDataOperator)
     bpy.utils.register_class(WorkerItem)
 
     bpy.types.Scene.Workers = bpy.props.CollectionProperty(type=WorkerItem)
@@ -229,6 +229,12 @@ def register():
         default=4,
         min=2,
         max=10)
+    bpy.types.Scene.Frames = bpy.props.IntProperty(
+        name="Frames",
+        description="Selecting the number of frame split",
+        default=15,
+        min=1,
+        max=50)
     bpy.types.Scene.Host = bpy.props.StringProperty(name="Host",
                                                     description="Add Host")
     bpy.types.Scene.ServerPort = bpy.props.IntProperty(
@@ -245,6 +251,18 @@ def register():
 
     bpy.types.Scene.RenderSettingEnable = bpy.props.BoolProperty(
         name="RenderSettingEnable", default=True)
+    bpy.types.Scene.DelCache = bpy.props.BoolProperty(name="DelCache",
+                                                      default=True)
+    bpy.types.Scene.TabIndex = bpy.props.EnumProperty(items=[
+        ('Image', 'Image', 'Render Image tab'),
+        ('Animation', 'Animation', 'Render Animation tab')
+    ],
+                                                      default='Image')
+    bpy.types.Scene.AnimationFun = bpy.props.EnumProperty(items=[
+        ("Frames", "Frames", "Use Frames to render animation"),
+        ("Tiles", "Tiles", "Use Tiles to render animation")
+    ],
+                                                          default="Frames")
 
 
 def unregister():
@@ -255,12 +273,13 @@ def unregister():
     bpy.utils.unregister_class(RenderImageOperator)
     bpy.utils.unregister_class(RenderAnimatonOperator)
     bpy.utils.unregister_class(WorkerItem)
-    bpy.utils.unregister_class(SyncDataOperator)
 
     del bpy.types.Scene.Workers
     del bpy.types.Scene.Workers_index
     del bpy.types.Scene.Tiles
+    del bpy.types.Scene.Frames
     del bpy.types.Scene.Host
     del bpy.types.Scene.FrameStart
     del bpy.types.Scene.FrameEnd
     del bpy.types.Scene.RenderSettingEnable
+    del bpy.types.Scene.TabIndex

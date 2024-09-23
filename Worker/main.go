@@ -31,7 +31,7 @@ func (c *Client) runClient() {
 		c.running = false
 		return
 	}
-	
+
 	c.conn = conn
 	c.running = true
 	fmt.Println("[Success] Connected success")
@@ -53,6 +53,10 @@ func (c *Client) recv() {
 		}
 
 		switch data["flag"] {
+		case "action":
+			if data["action"] == "test conn" {
+				c.conn.Write(([]byte("conn ok")))
+			}
 		case "sync":
 			c.blendFile = data["blend_file"].(string)
 			c.scene = data["scene"].(string)
