@@ -24,7 +24,6 @@ bl_info = {
 }
 
 import json
-import os
 import threading
 import bpy
 import socket
@@ -56,7 +55,6 @@ class RenderWorkshopMenu(bpy.types.Panel):
         net_row.label(text="Port: " + str(context.scene.ServerPort))
 
         server_box.label(text=context.scene.ServerStatus)
-        server_box.label(text=scene.RenderStatus)
         layout.separator()
         layout.template_list("WorkerItemList",
                              "Workers",
@@ -94,7 +92,8 @@ class StartServerOperator(bpy.types.Operator):
                 server_thread.start()
                 self.report({"INFO"}, message="Server start")
                 StartServerOperator.bl_label = "Stop Server"
-            except:
+            except Exception as e:
+                print(f"[Error] Stop Server error:{e}")
                 server.stop_server()
                 StartServerOperator.bl_label = "Start Server"
 
@@ -172,13 +171,6 @@ class RenderImageOperator(bpy.types.Operator):
     bl_idname = "render.render_image"
     bl_label = "Render Image"
 
-    def checkTasklist(self, tasklist):
-        for i in tasklist:
-            if i["complete"] is False:
-                return True
-            else:
-                return False
-
     def execute(self, context):
         tasklist = []
         for index, border in enumerate(utils.getborders(context.scene.Tiles)):
@@ -201,11 +193,12 @@ class RenderImageOperator(bpy.types.Operator):
                 "blendfile": item.blendfile.strip('"')
             }
             workerlist.append(worker)
-            bpy.ops.wm.window_new()
-            area = bpy.context.window_manager.windows[-1].screen.areas[0]
-            area.ui_type = 'IMAGE_EDITOR'
 
-            utils.manage_threads(server, area, tasklist, workerlist)
+        bpy.ops.wm.window_new()
+        area = bpy.context.window_manager.windows[-1].screen.areas[0]
+        area.ui_type = 'IMAGE_EDITOR'
+
+        utils.manage_threads(server, area, tasklist, workerlist)
 
         return {'FINISHED'}
 
@@ -215,7 +208,6 @@ class RenderAnimatonOperator(bpy.types.Operator):
     bl_label = "Render Animation"
 
     def execute(self, context):
-
         return {'FINISHED'}
 
 
@@ -250,8 +242,7 @@ def register():
     bpy.types.Scene.FrameEnd = bpy.props.IntProperty(name="FrameEnd",
                                                      default=1,
                                                      min=0)
-    bpy.types.Scene.RenderStatus = bpy.props.StringProperty(
-        name="RenderStatus", default="Render Status")
+
     bpy.types.Scene.RenderSettingEnable = bpy.props.BoolProperty(
         name="RenderSettingEnable", default=True)
 
@@ -272,5 +263,4 @@ def unregister():
     del bpy.types.Scene.Host
     del bpy.types.Scene.FrameStart
     del bpy.types.Scene.FrameEnd
-    del bpy.types.Scene.RenderStatus
     del bpy.types.Scene.RenderSettingEnable

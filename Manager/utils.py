@@ -91,8 +91,9 @@ def merge_image(area):
 
     images = []
     for i in os.listdir(tempfilepath):
-        tmpfile = os.path.join(tempfilepath, i)
-        images.append(bpy.data.images.load(tmpfile))
+        if i.endswith(".png"):
+            tmpfile = os.path.join(tempfilepath, i)
+            images.append(bpy.data.images.load(tmpfile))
 
     scene = bpy.context.scene
     bpy.context.scene.use_nodes = True
@@ -119,7 +120,7 @@ def merge_image(area):
     result_node = tree.nodes.new(type='CompositorNodeComposite')
     links.new(result_image.outputs[0], result_node.inputs[0])
 
-    composite_file_path = os.path.join("/tmp/", "composite.png")
+    composite_file_path = os.path.join("/tmp/", "result.png")
     scene.render.filepath = composite_file_path
     scene.render.use_border = False
     bpy.ops.render.render(write_still=True)
@@ -132,17 +133,10 @@ def merge_image(area):
     shutil.rmtree(tempfilepath)
 
 
-# def delete_slice_files(num, save_path):
-#     for i in range(num):
-#         file_name = os.path.join(save_path, f"render_{i:04d}.png")
-#         if os.path.exists(file_name):
-#             os.remove(file_name)
-
-
 def run_task(server, area, task, worker):
     scene = bpy.context.scene
     if worker["render"] and worker["online"]:
-        scene.RenderStatus = f"{worker['host']} is rendering tile {task['index']}"
+        print(f"{worker['host']} is rendering tile {task['index']}")
         send_data = {
             "flag": "sync",
             "blend_file": worker["blendfile"],
@@ -160,17 +154,16 @@ def run_task(server, area, task, worker):
 
         try:
             tempfilename = server.recv_data(worker["host"])
-            if tempfilename:
-                image = bpy.data.images.load(
-                    os.path.dirname(bpy.data.filepath) + "/temp/" +
-                    tempfilename)
 
+            if tempfilename:
+                img = os.path.join(os.path.dirname(bpy.data.filepath), "temp",
+                                   tempfilename)
+                image = bpy.data.images.load(img)
                 area.spaces.active.image = image
                 task["worker"] = worker["host"]
                 task["end_time"] = time.time()
                 worker["render"] = True
                 task["complete"] = True
-                scene.RenderStatus = f"Tile {task['index']} render success, cost {str(task['end_time'] - task['start_time'])}"
         except Exception as e:
             worker["online"] = False
             print(f"[Error] task run error: {e}")
