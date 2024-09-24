@@ -53,10 +53,6 @@ func (c *Client) recv() {
 		}
 
 		switch data["flag"] {
-		case "action":
-			if data["action"] == "test conn" {
-				c.conn.Write(([]byte("conn ok")))
-			}
 		case "sync":
 			c.blendFile = data["blend_file"].(string)
 			c.scene = data["scene"].(string)
@@ -67,19 +63,17 @@ func (c *Client) recv() {
 			}
 			c.frame = int(data["frame"].(float64))
 			c.flag = true
+			fmt.Println("[Info] recv render data", c)
 			c.conn.Write([]byte("ok"))
 
 		case "render":
 			blendFilePath := filepath.Dir(c.blendFile)
 			tempPath := filepath.Join(blendFilePath, "temp")
 
-			if _, err := os.Stat(tempPath); os.IsNotExist(err) {
-				os.Mkdir(tempPath, os.ModePerm)
-			}
-
 			keyTime := strconv.FormatInt(time.Now().Unix(), 10)
 			tempFilename := filepath.Join(tempPath, keyTime+".png")
 			if c.flag {
+				fmt.Println("[Info] start render ", c.border)
 				command := exec.Command(
 					blenderPath, "-b", "--python", "./render.py", "--", c.blendFile, c.scene,
 					"--border",
@@ -90,9 +84,17 @@ func (c *Client) recv() {
 					"--frame_number", strconv.Itoa(c.frame),
 					"--save_path", tempFilename,
 				)
-				if err := command.Run(); err == nil {
-					c.conn.Write([]byte(keyTime + ".png"))
+				out, err := command.CombinedOutput()
+				if err != nil {
+					fmt.Printf("[Error] get command error: %v\n", err)
 				}
+				fmt.Println(string(out))
+				if err := command.Run(); err == nil {
+					fmt.Println(err)
+				}
+				c.conn.Write([]byte(keyTime + ".png"))
+				fmt.Println("[Info] success render image ", c.border, tempFilename)
+
 			}
 		}
 	}

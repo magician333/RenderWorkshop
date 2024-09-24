@@ -22,69 +22,8 @@ def getborders(num):
     return borders
 
 
-# def render_divided(num, save_path):
-#     scene = bpy.context.scene
-#     width = scene.render.resolution_x
-#     part_width = width // num
-#     original_output_path = scene.render.filepath
-
-#     images = []
-#     for i in range(num):
-#         scene.render.use_border = True
-#         min_x = i * part_width / width
-#         max_x = (i + 1) * part_width / width
-#         min_y = 0
-#         max_y = 1
-#         scene.render.border_min_x = min_x
-#         scene.render.border_max_x = max_x
-#         scene.render.border_min_y = min_y
-#         scene.render.border_max_y = max_y
-#         file_name = os.path.join(save_path, f"render_{i:04d}.png")
-#         scene.render.filepath = file_name
-#         bpy.ops.render.render(write_still=True)
-
-#         if os.path.exists(file_name):
-#             images.append(bpy.data.images.load(file_name))
-#     scene.render.filepath = original_output_path
-
-#     bpy.context.scene.use_nodes = True
-#     tree = bpy.context.scene.node_tree
-#     links = tree.links
-
-#     for n in tree.nodes:
-#         tree.nodes.remove(n)
-
-#     input_nodes = []
-#     for image in images:
-#         input_image = tree.nodes.new(type='CompositorNodeImage')
-#         input_image.image = image
-#         input_nodes.append(input_image)
-
-#     result_image = input_nodes[0]
-#     for i in range(1, len(input_nodes)):
-#         merge_node = tree.nodes.new(type='CompositorNodeAlphaOver')
-#         links.new(result_image.outputs[0], merge_node.inputs[1])
-#         links.new(input_nodes[i].outputs[0], merge_node.inputs[2])
-#         result_image = merge_node
-
-#     result_node = tree.nodes.new(type='CompositorNodeComposite')
-#     links.new(result_image.outputs[0], result_node.inputs[0])
-
-#     composite_file_path = os.path.join(save_path, "composite.png")
-#     scene.render.filepath = composite_file_path
-#     scene.render.use_border = False
-#     bpy.ops.render.render(write_still=True)
-
-#     for n in tree.nodes:
-#         tree.nodes.remove(n)
-#     bpy.context.scene.use_nodes = False
-#     delete_slice_files(num, save_path)
-
-
-def merge_image(area):
+def merge_image(area, outputfilepath, outputfilename):
     tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
-
-    print(tempfilepath)
     if not os.path.exists(tempfilepath):
         print(f"[Error] temp path error")
         return
@@ -109,7 +48,6 @@ def merge_image(area):
         input_image = tree.nodes.new(type='CompositorNodeImage')
         input_image.image = image
         input_nodes.append(input_image)
-
     result_image = input_nodes[0]
     for i in range(1, len(input_nodes)):
         merge_node = tree.nodes.new(type='CompositorNodeAlphaOver')
@@ -120,7 +58,7 @@ def merge_image(area):
     result_node = tree.nodes.new(type='CompositorNodeComposite')
     links.new(result_image.outputs[0], result_node.inputs[0])
 
-    composite_file_path = os.path.join("/tmp/", "result.png")
+    composite_file_path = os.path.join(outputfilepath, outputfilename)
     scene.render.filepath = composite_file_path
     scene.render.use_border = False
     bpy.ops.render.render(write_still=True)
@@ -130,11 +68,9 @@ def merge_image(area):
     bpy.context.scene.use_nodes = False
     image = bpy.data.images.load(composite_file_path)
     area.spaces.active.image = image
-    if scene.DelCache:
-        shutil.rmtree(tempfilepath)
 
 
-def run_task(server, area, task, worker):
+def run_task(server, area, task, worker, frame):
     scene = bpy.context.scene
     if worker["render"] and worker["online"]:
         print(f"{worker['host']} is rendering tile {task['index']}")
@@ -143,7 +79,7 @@ def run_task(server, area, task, worker):
             "blend_file": worker["blendfile"],
             "scene": scene.name,
             "border": task["border"],
-            "frame": scene.frame_start
+            "frame": frame
         }
         task["start_time"] = time.time()
         server.send_data(json.dumps(send_data).encode("utf-8"), worker["host"])
@@ -155,10 +91,12 @@ def run_task(server, area, task, worker):
 
         try:
             tempfilename = server.recv_data(worker["host"])
-
+            if tempfilename == "ok":
+                return
             if tempfilename:
                 img = os.path.join(os.path.dirname(bpy.data.filepath), "temp",
                                    tempfilename)
+
                 image = bpy.data.images.load(img)
                 area.spaces.active.image = image
                 task["worker"] = worker["host"]
@@ -168,24 +106,30 @@ def run_task(server, area, task, worker):
         except Exception as e:
             worker["online"] = False
             print(f"[Error] task run error: {e}")
-            scene.RenderStatus = f"Tile {task['index']} render error"
 
 
-def worker_thread(server, area, tasklist, worker):
+def worker_thread(server, area, tasklist, worker, frame):
     while any(not task["complete"] for task in tasklist):
         if worker["render"] and worker["online"]:
             for task in tasklist:
                 if not task["complete"]:
-                    run_task(server, area, task, worker)
+                    run_task(server, area, task, worker, frame)
                     break
         time.sleep(0.1)
 
 
-def manage_threads(server, area, tasklist, workerlist):
+def manage_threads(server, area, tasklist, workerlist, outputfilepath,
+                   outputfilename, frame):
     threads = []
+    tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
+    if os.path.exists(tempfilepath):
+        shutil.rmtree(tempfilepath)
+        os.mkdir(tempfilepath)
+    else:
+        os.mkdir(tempfilepath)
     for worker in workerlist:
         thread = threading.Thread(target=worker_thread,
-                                  args=(server, area, tasklist, worker))
+                                  args=(server, area, tasklist, worker, frame))
         thread.start()
         threads.append(thread)
 
@@ -193,8 +137,10 @@ def manage_threads(server, area, tasklist, workerlist):
         if any(thread.is_alive() for thread in threads):
             return 1.0
         bpy.context.scene.RenderSettingEnable = True
-
-        merge_image(area=area)
+        merge_image(area,
+                    outputfilepath=outputfilepath,
+                    outputfilename=outputfilename)
+        shutil.rmtree(tempfilepath)
         return None
 
     bpy.app.timers.register(check_threads)

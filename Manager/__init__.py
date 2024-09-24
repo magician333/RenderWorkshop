@@ -23,7 +23,10 @@ bl_info = {
     "category": "Generic",
 }
 
+import os
+import shutil
 import threading
+import time
 import bpy
 import socket
 from . import utils, Server
@@ -70,10 +73,6 @@ class RenderWorkshopMenu(bpy.types.Panel):
             render_setting = tab.column()
 
             render_setting.prop(scene, "Tiles", text="Tile Split")
-            render_setting.separator()
-            render_setting.prop(scene,
-                                "DelCache",
-                                text="Delete the tiles cache")
             render_setting.separator()
             render_setting.operator(RenderImageOperator.bl_idname,
                                     text=RenderImageOperator.bl_label,
@@ -173,6 +172,10 @@ class RenderImageOperator(bpy.types.Operator):
     bl_label = "Render Image"
 
     def execute(self, context):
+        if bpy.data.filepath == "":
+            self.report(type="ERROR",
+                        message="Must save file to share storage")
+            return
         tasklist = []
         for index, border in enumerate(utils.getborders(context.scene.Tiles)):
             task = {
@@ -198,8 +201,16 @@ class RenderImageOperator(bpy.types.Operator):
         bpy.ops.wm.window_new()
         area = bpy.context.window_manager.windows[-1].screen.areas[0]
         area.ui_type = 'IMAGE_EDITOR'
-
-        utils.manage_threads(server, area, tasklist, workerlist)
+        outputfilepath = os.path.dirname(bpy.data.filepath)
+        outputfilename = context.scene.name + ".png"
+        context.scene.RenderSettingEnable = False
+        utils.manage_threads(server=server,
+                             area=area,
+                             tasklist=tasklist,
+                             workerlist=workerlist,
+                             outputfilepath=outputfilepath,
+                             outputfilename=outputfilename,
+                             frame=context.scene.frame_current)
 
         return {'FINISHED'}
 
@@ -209,6 +220,15 @@ class RenderAnimatonOperator(bpy.types.Operator):
     bl_label = "Render Animation"
 
     def execute(self, context):
+        if bpy.data.filepath == "":
+            self.report(type={"ERROR"},
+                        message="Must save file to share storage")
+            return
+        if context.scene.AnimationFun == "Frames":
+            self.report(type={"INFO"}, message="Frames")
+        else:
+            self.report(type={"INFO"}, message="Tiles")
+
         return {'FINISHED'}
 
 
@@ -251,8 +271,6 @@ def register():
 
     bpy.types.Scene.RenderSettingEnable = bpy.props.BoolProperty(
         name="RenderSettingEnable", default=True)
-    bpy.types.Scene.DelCache = bpy.props.BoolProperty(name="DelCache",
-                                                      default=True)
     bpy.types.Scene.TabIndex = bpy.props.EnumProperty(items=[
         ('Image', 'Image', 'Render Image tab'),
         ('Animation', 'Animation', 'Render Animation tab')
