@@ -144,3 +144,44 @@ def manage_threads(server, area, tasklist, workerlist, outputfilepath,
         return None
 
     bpy.app.timers.register(check_threads)
+
+
+def render_animation(server, workerlist, task):
+    scene = bpy.context.scene
+    renderfilepath = os.path.join(os.path.dirname(bpy.data.filepath),
+                                  bpy.context.scene.name)
+    if not os.path.exists(renderfilepath):
+        os.mkdir(renderfilepath)
+    for worker in workerlist:
+        if worker["render"] and worker["online"]:
+            print(f"{worker['host']} is rendering")
+            send_data = {
+                "flag": "sync",
+                "blend_file": worker["blendfile"],
+                "scene": scene.name,
+                "border": task["border"],
+                "frame": task["frame_range"]
+            }
+            task["start_time"] = time.time()
+            server.send_data(
+                json.dumps(send_data).encode("utf-8"), worker["host"])
+            server.send_data(
+                json.dumps({
+                    "flag": "render_animation"
+                }).encode("utf-8"), worker["host"])
+            worker["render"] = False
+
+            try:
+                #put recv to backend,add progressbar
+                tempfilename = server.recv_data(worker["host"])
+                if tempfilename == "ok":
+                    return
+                if tempfilename:
+                    task["worker"] = worker["host"]
+                    task["end_time"] = time.time()
+                    worker["render"] = True
+                    task["complete"] = True
+                    print(f"[Info] render image success {tempfilename}")
+            except Exception as e:
+                worker["online"] = False
+                print(f"[Error] task run error: {e}")

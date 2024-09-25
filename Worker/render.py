@@ -49,6 +49,7 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:])
     try:
         output_file = render_scene(args.file_path, args.scene_name,
-                                   args.border, args.frame_number,args.save_path)
+                                   args.border, args.frame_number,
+                                   args.save_path)
     except Exception as e:
         print(f"An error occurred: {e}", file=sys.stderr)

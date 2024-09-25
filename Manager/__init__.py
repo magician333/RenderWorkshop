@@ -102,7 +102,8 @@ class RenderWorkshopMenu(bpy.types.Panel):
             render_setting.operator(RenderAnimatonOperator.bl_idname,
                                     text=RenderAnimatonOperator.bl_label,
                                     icon="FILE_MOVIE")
-        render_setting.enabled = scene.RenderSettingEnable
+        # render_setting.enabled = scene.RenderSettingEnable
+        render_setting.enabled = True
 
 
 class StartServerOperator(bpy.types.Operator):
@@ -210,7 +211,10 @@ class RenderImageOperator(bpy.types.Operator):
                              workerlist=workerlist,
                              outputfilepath=outputfilepath,
                              outputfilename=outputfilename,
-                             frame=context.scene.frame_current)
+                             frame=[
+                                 context.scene.frame_current,
+                                 context.scene.frame_current + 1
+                             ])
 
         return {'FINISHED'}
 
@@ -224,8 +228,41 @@ class RenderAnimatonOperator(bpy.types.Operator):
             self.report(type={"ERROR"},
                         message="Must save file to share storage")
             return
+        start_frame, end_frame = context.scene.FrameStart, context.scene.FrameEnd
         if context.scene.AnimationFun == "Frames":
-            self.report(type={"INFO"}, message="Frames")
+            tasklist = []
+            current_start = start_frame
+            index = 0
+            step = context.scene.Frames
+            while current_start < end_frame:
+                currrent_end = min(current_start + step - 1, end_frame)
+                task = {
+                    "index": index,
+                    "border": [0, 1, 0, 1],
+                    "worker": "",
+                    "start_time": 0,
+                    "end_time": 0,
+                    "complete": False,
+                    "frame_range": [current_start, currrent_end]
+                }
+                tasklist.append(task)
+                current_start += step
+                index += 1
+
+            workerlist = []
+            for item in context.scene.Workers:
+                worker = {
+                    "host": item.host,
+                    "render": True,
+                    "online": True,
+                    "blendfile": item.blendfile.strip('"')
+                }
+                workerlist.append(worker)
+
+            for task in tasklist:
+                utils.render_animation(server=server,
+                                       workerlist=workerlist,
+                                       task=task)
         else:
             self.report(type={"INFO"}, message="Tiles")
 

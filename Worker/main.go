@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"time"
 )
 
 type Client struct {
@@ -19,7 +20,7 @@ type Client struct {
 	blendFile  string
 	scene      string
 	border     []float64
-	frame      int
+	frame      []int
 	flag       bool
 }
 
@@ -61,9 +62,21 @@ func (c *Client) recv() {
 			for i, v := range borderData {
 				c.border[i] = v.(float64)
 			}
-			c.frame = int(data["frame"].(float64))
-			c.flag = true
+
+			frameData := data["frame"].([]interface{})
+			c.frame = make([]int, len(frameData))
+			for i, v := range frameData {
+				switch value := v.(type) {
+				case int:
+					c.frame[i] = value
+				case float64:
+					c.frame[i] = int(value)
+				default:
+					fmt.Printf("Conversion failed for element at index %d, type %T\n", i, v)
+				}
+			}
 			fmt.Println("[Info] recv render data", c)
+			c.flag = true
 			c.conn.Write([]byte("ok"))
 
 		case "render":
@@ -72,6 +85,7 @@ func (c *Client) recv() {
 
 			keyTime := strconv.FormatInt(time.Now().Unix(), 10)
 			tempFilename := filepath.Join(tempPath, keyTime+".png")
+
 			if c.flag {
 				fmt.Println("[Info] start render ", c.border)
 				command := exec.Command(
@@ -81,7 +95,7 @@ func (c *Client) recv() {
 					strconv.FormatFloat(c.border[1], 'f', -1, 64),
 					strconv.FormatFloat(c.border[2], 'f', -1, 64),
 					strconv.FormatFloat(c.border[3], 'f', -1, 64),
-					"--frame_number", strconv.Itoa(c.frame),
+					"--frame_number", strconv.Itoa(c.frame[0]),
 					"--save_path", tempFilename,
 				)
 				out, err := command.CombinedOutput()
@@ -94,7 +108,36 @@ func (c *Client) recv() {
 				}
 				c.conn.Write([]byte(keyTime + ".png"))
 				fmt.Println("[Info] success render image ", c.border, tempFilename)
+			}
+		case "render_animation":
+			blendFilePath := filepath.Dir(c.blendFile)
+			tempPath := filepath.Join(blendFilePath, c.scene)
 
+			for frame := c.frame[0]; frame <= c.frame[len(c.frame)-1]; frame++ {
+				tempFilename := filepath.Join(tempPath, strconv.Itoa(frame)+".png")
+				if c.flag {
+					fmt.Println("[Info] start render ", c.border)
+					command := exec.Command(
+						blenderPath, "-b", "--python", "./render.py", "--", c.blendFile, c.scene,
+						"--border",
+						strconv.FormatFloat(c.border[0], 'f', -1, 64),
+						strconv.FormatFloat(c.border[1], 'f', -1, 64),
+						strconv.FormatFloat(c.border[2], 'f', -1, 64),
+						strconv.FormatFloat(c.border[3], 'f', -1, 64),
+						"--frame_number", strconv.Itoa(frame),
+						"--save_path", tempFilename,
+					)
+					out, err := command.CombinedOutput()
+					if err != nil {
+						fmt.Printf("[Error] get command error: %v\n", err)
+					}
+					fmt.Println(string(out))
+					if err := command.Run(); err == nil {
+						fmt.Println(err)
+					}
+					c.conn.Write([]byte(strconv.Itoa(frame) + ".png"))
+					fmt.Println("[Info] success render image ", c.border, tempFilename)
+				}
 			}
 		}
 	}
@@ -129,7 +172,6 @@ func main() {
 		serverAddr: serverIP,
 		port:       serverPort,
 	}
-
 	client.runClient()
 	client.recv()
 }
