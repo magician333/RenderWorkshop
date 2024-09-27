@@ -46,10 +46,9 @@ Image sequence rendering has two modes
  - [x] manger slicing and task distribution
  - [x] worker image return
  - [x] manager merge image
- - [ ] manger automatically shares blend files (if possible)
  - [ ] animation rendering (partitioned rendering)
- - [ ] animation rendering (multi-frame rendering)
- - [ ] worker file packing executable
+ - [x] animation rendering (multi-frame rendering)
+ - [x] worker file packing executable
  - [ ] worker online status feedback
  - [ ] UI active refresh (current UI will not be actively refreshed, you need to move the mouse, etc. to refresh)
  - [ ] multi-platform blender test (currently based on Windows)

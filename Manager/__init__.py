@@ -102,8 +102,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
             render_setting.operator(RenderAnimatonOperator.bl_idname,
                                     text=RenderAnimatonOperator.bl_label,
                                     icon="FILE_MOVIE")
-        # render_setting.enabled = scene.RenderSettingEnable
-        render_setting.enabled = True
+        render_setting.enabled = scene.RenderSettingEnable
 
 
 class StartServerOperator(bpy.types.Operator):
@@ -180,12 +179,22 @@ class RenderImageOperator(bpy.types.Operator):
         tasklist = []
         for index, border in enumerate(utils.getborders(context.scene.Tiles)):
             task = {
-                "index": index,
-                "border": border,
-                "worker": "",
-                "start_time": 0,
-                "end_time": 0,
-                "complete": False
+                "index":
+                index,
+                "border":
+                border,
+                "worker":
+                "",
+                "start_time":
+                0,
+                "end_time":
+                0,
+                "complete":
+                False,
+                "lock":
+                None,
+                "frame":
+                [context.scene.frame_current, context.scene.frame_current + 1]
             }
             tasklist.append(task)
 
@@ -205,17 +214,16 @@ class RenderImageOperator(bpy.types.Operator):
         outputfilepath = os.path.dirname(bpy.data.filepath)
         outputfilename = context.scene.name + ".png"
         context.scene.RenderSettingEnable = False
-        utils.manage_threads(server=server,
-                             area=area,
-                             tasklist=tasklist,
-                             workerlist=workerlist,
-                             outputfilepath=outputfilepath,
-                             outputfilename=outputfilename,
-                             frame=[
-                                 context.scene.frame_current,
-                                 context.scene.frame_current + 1
-                             ])
-
+        self.report(type={"INFO"}, message="Start Render Image")
+        utils.manage_image_threads(
+            server=server,
+            area=area,
+            tasklist=tasklist,
+            workerlist=workerlist,
+            outputfilepath=outputfilepath,
+            outputfilename=outputfilename,
+        )
+        self.report(type={"INFO"}, message="Render Image Finished")
         return {'FINISHED'}
 
 
@@ -234,8 +242,9 @@ class RenderAnimatonOperator(bpy.types.Operator):
             current_start = start_frame
             index = 0
             step = context.scene.Frames
+
             while current_start < end_frame:
-                currrent_end = min(current_start + step - 1, end_frame)
+                current_end = min(current_start + step - 1, end_frame)
                 task = {
                     "index": index,
                     "border": [0, 1, 0, 1],
@@ -243,7 +252,8 @@ class RenderAnimatonOperator(bpy.types.Operator):
                     "start_time": 0,
                     "end_time": 0,
                     "complete": False,
-                    "frame_range": [current_start, currrent_end]
+                    "lock": None,
+                    "frame_range": [current_start, current_end]
                 }
                 tasklist.append(task)
                 current_start += step
@@ -258,11 +268,9 @@ class RenderAnimatonOperator(bpy.types.Operator):
                     "blendfile": item.blendfile.strip('"')
                 }
                 workerlist.append(worker)
-
-            for task in tasklist:
-                utils.render_animation(server=server,
-                                       workerlist=workerlist,
-                                       task=task)
+            self.report(type={"INFO"}, message="Start Render Animation")
+            utils.manage_animation_threads(server, tasklist, workerlist)
+            self.report(type={"INFO"}, message="Render Animation Finished")
         else:
             self.report(type={"INFO"}, message="Tiles")
 

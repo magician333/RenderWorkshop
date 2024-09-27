@@ -75,11 +75,10 @@ func (c *Client) recv() {
 					fmt.Printf("Conversion failed for element at index %d, type %T\n", i, v)
 				}
 			}
-			fmt.Println("[Info] recv render data", c)
 			c.flag = true
-			c.conn.Write([]byte("ok"))
+			c.conn.Write([]byte("ack"))
 
-		case "render":
+		case "render_image":
 			blendFilePath := filepath.Dir(c.blendFile)
 			tempPath := filepath.Join(blendFilePath, "temp")
 
@@ -98,11 +97,7 @@ func (c *Client) recv() {
 					"--frame_number", strconv.Itoa(c.frame[0]),
 					"--save_path", tempFilename,
 				)
-				out, err := command.CombinedOutput()
-				if err != nil {
-					fmt.Printf("[Error] get command error: %v\n", err)
-				}
-				fmt.Println(string(out))
+
 				if err := command.Run(); err == nil {
 					fmt.Println(err)
 				}
@@ -116,7 +111,7 @@ func (c *Client) recv() {
 			for frame := c.frame[0]; frame <= c.frame[len(c.frame)-1]; frame++ {
 				tempFilename := filepath.Join(tempPath, strconv.Itoa(frame)+".png")
 				if c.flag {
-					fmt.Println("[Info] start render ", c.border)
+					fmt.Println("[Info] start render ", frame)
 					command := exec.Command(
 						blenderPath, "-b", "--python", "./render.py", "--", c.blendFile, c.scene,
 						"--border",
@@ -127,18 +122,13 @@ func (c *Client) recv() {
 						"--frame_number", strconv.Itoa(frame),
 						"--save_path", tempFilename,
 					)
-					out, err := command.CombinedOutput()
-					if err != nil {
-						fmt.Printf("[Error] get command error: %v\n", err)
-					}
-					fmt.Println(string(out))
-					if err := command.Run(); err == nil {
+					if err := command.Run(); err != nil {
 						fmt.Println(err)
 					}
-					c.conn.Write([]byte(strconv.Itoa(frame) + ".png"))
 					fmt.Println("[Info] success render image ", c.border, tempFilename)
 				}
 			}
+			c.conn.Write([]byte("success"))
 		}
 	}
 }
@@ -155,7 +145,7 @@ func main() {
 
 	var config map[string]interface{}
 	if err := json.Unmarshal(configData, &config); err != nil {
-		fmt.Printf("[Error] json unmarshal error: %v\n", err)
+		fmt.Printf("[Error] config json unmarshal error: %v\n", err)
 		return
 	}
 

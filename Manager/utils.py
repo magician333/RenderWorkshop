@@ -70,7 +70,7 @@ def merge_image(area, outputfilepath, outputfilename):
     area.spaces.active.image = image
 
 
-def run_task(server, area, task, worker, frame):
+def render_image(server, area, task, worker):
     scene = bpy.context.scene
     if worker["render"] and worker["online"]:
         print(f"{worker['host']} is rendering tile {task['index']}")
@@ -79,13 +79,18 @@ def run_task(server, area, task, worker, frame):
             "blend_file": worker["blendfile"],
             "scene": scene.name,
             "border": task["border"],
-            "frame": frame
+            "frame": task["frame"]
         }
         task["start_time"] = time.time()
+        if task["lock"] is not None and task["lock"] != worker["host"]:
+            print(
+                f"[Info] task {task['frame_range']} is already locked by {task['lock']}"
+            )
+            return
         server.send_data(json.dumps(send_data).encode("utf-8"), worker["host"])
         server.send_data(
             json.dumps({
-                "flag": "render"
+                "flag": "render_image"
             }).encode("utf-8"), worker["host"])
         worker["render"] = False
 
@@ -106,20 +111,27 @@ def run_task(server, area, task, worker, frame):
         except Exception as e:
             worker["online"] = False
             print(f"[Error] task run error: {e}")
+        finally:
+            task["lock"] = None
 
 
-def worker_thread(server, area, tasklist, worker, frame):
+def worker_image_thread(server, area, tasklist, worker):
     while any(not task["complete"] for task in tasklist):
         if worker["render"] and worker["online"]:
             for task in tasklist:
-                if not task["complete"]:
-                    run_task(server, area, task, worker, frame)
-                    break
+                if not task["complete"] and task["lock"] is None:
+                    if worker.get("task_lock", None) is None:
+                        worker["task_lock"] = threading.Lock()
+                    with worker["task_lock"]:
+                        if task["lock"] is None:
+                            task["lock"] = worker["host"]
+                            render_image(server, area, task, worker)
+                            break
         time.sleep(0.1)
 
 
-def manage_threads(server, area, tasklist, workerlist, outputfilepath,
-                   outputfilename, frame):
+def manage_image_threads(server, area, tasklist, workerlist, outputfilepath,
+                         outputfilename):
     threads = []
     tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
     if os.path.exists(tempfilepath):
@@ -128,8 +140,8 @@ def manage_threads(server, area, tasklist, workerlist, outputfilepath,
     else:
         os.mkdir(tempfilepath)
     for worker in workerlist:
-        thread = threading.Thread(target=worker_thread,
-                                  args=(server, area, tasklist, worker, frame))
+        thread = threading.Thread(target=worker_image_thread,
+                                  args=(server, area, tasklist, worker))
         thread.start()
         threads.append(thread)
 
@@ -146,42 +158,77 @@ def manage_threads(server, area, tasklist, workerlist, outputfilepath,
     bpy.app.timers.register(check_threads)
 
 
-def render_animation(server, workerlist, task):
+def render_animation(server, worker, task):
     scene = bpy.context.scene
     renderfilepath = os.path.join(os.path.dirname(bpy.data.filepath),
-                                  bpy.context.scene.name)
+                                  scene.name)
+
     if not os.path.exists(renderfilepath):
         os.mkdir(renderfilepath)
+
+    print(f"{worker['host']} is rendering")
+    send_data = {
+        "flag": "sync",
+        "blend_file": worker["blendfile"],
+        "scene": scene.name,
+        "border": task["border"],
+        "frame": task["frame_range"]
+    }
+    task["start_time"] = time.time()
+    if task["lock"] is not None and task["lock"] != worker["host"]:
+        print(
+            f"[Info] task {task['frame_range']} is already locked by {task['lock']}"
+        )
+        return
+    server.send_data(json.dumps(send_data).encode("utf-8"), worker["host"])
+    server.send_data(
+        json.dumps({
+            "flag": "render_animation"
+        }).encode("utf-8"), worker["host"])
+    worker["render"] = False
+    try:
+        status = server.recv_data(worker["host"])
+        if status:
+            task["worker"] = worker["host"]
+            task["end_time"] = time.time()
+            task["complete"] = True
+            worker["render"] = True
+            print(f"[Info] {worker['host']} render image success")
+    except Exception as e:
+        worker["online"] = False
+        print(f"[Error] Task run error: {e}")
+    finally:
+        task["lock"] = None
+
+
+def worker_animation_thread(server, tasklist, worker):
+    while any(not task["complete"] for task in tasklist):
+        if worker["render"] and worker["online"]:
+            for task in tasklist:
+                if not task["complete"] and task["lock"] is None:
+                    if worker.get("task_lock", None) is None:
+                        worker["task_lock"] = threading.Lock()
+                    with worker["task_lock"]:
+                        if task["lock"] is None:
+                            task["lock"] = worker["host"]
+                            render_animation(server, worker, task)
+                            break
+        time.sleep(0.1)
+
+
+def manage_animation_threads(server, tasklist, workerlist):
+    threads = []
     for worker in workerlist:
         if worker["render"] and worker["online"]:
-            print(f"{worker['host']} is rendering")
-            send_data = {
-                "flag": "sync",
-                "blend_file": worker["blendfile"],
-                "scene": scene.name,
-                "border": task["border"],
-                "frame": task["frame_range"]
-            }
-            task["start_time"] = time.time()
-            server.send_data(
-                json.dumps(send_data).encode("utf-8"), worker["host"])
-            server.send_data(
-                json.dumps({
-                    "flag": "render_animation"
-                }).encode("utf-8"), worker["host"])
-            worker["render"] = False
+            thread = threading.Thread(target=worker_animation_thread,
+                                      args=(server, tasklist, worker))
+            thread.start()
+            threads.append(thread)
 
-            try:
-                #put recv to backend,add progressbar
-                tempfilename = server.recv_data(worker["host"])
-                if tempfilename == "ok":
-                    return
-                if tempfilename:
-                    task["worker"] = worker["host"]
-                    task["end_time"] = time.time()
-                    worker["render"] = True
-                    task["complete"] = True
-                    print(f"[Info] render image success {tempfilename}")
-            except Exception as e:
-                worker["online"] = False
-                print(f"[Error] task run error: {e}")
+    def check_threads():
+        if any(thread.is_alive() for thread in threads):
+            return 1.0
+        bpy.context.scene.RenderSettingEnable = True
+        return None
+
+    bpy.app.timers.register(check_threads)

@@ -25,8 +25,11 @@ class Server:
 
         except Exception as e:
             print(f"[Error] server error:{e}")
-            self.sock.close()
-            context.scene.ServerStatus = "Server cause error"
+            try:
+                self.sock.close()
+            except Exception as e:
+                print(f"[Error] close server error:{e}")
+                context.scene.ServerStatus = "Server cause error"
 
         while self.running:
             try:
