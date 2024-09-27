@@ -1,6 +1,5 @@
-# RenderWorkshop
 ![logo](./img/logo.png)
-
+---
 **RenderWorkshop** 是适用于 [Blender](https://www.blender.org/) 的开源免费的分布式渲染工具，使用多台设备渲染单帧图像/图像序列，大幅加快渲染速度，尤其适用于拥有多设备的小型工作室/公司/个人内网环境。
 
 图片

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"net"
@@ -123,7 +124,7 @@ func (c *Client) recv() {
 						"--save_path", tempFilename,
 					)
 					if err := command.Run(); err != nil {
-						fmt.Println(err)
+						fmt.Println("[Error] ", err)
 					}
 					fmt.Println("[Info] success render image ", c.border, tempFilename)
 				}
@@ -137,7 +138,7 @@ var blenderPath string
 
 func main() {
 	fmt.Println("RenderWorkShop [worker] is running...")
-	configData, err := os.ReadFile("./config.json")
+	configData, err := os.ReadFile("config.json")
 	if err != nil {
 		fmt.Printf("[Error] reading config file: %v\n", err)
 		return
@@ -157,6 +158,15 @@ func main() {
 
 	blenderPath = config["blender_path"].(string)
 	fmt.Printf("[Info] blender path: %s\n", blenderPath)
+	com := exec.Command(blenderPath, "-v")
+	out, err := com.CombinedOutput()
+	if err != nil {
+		fmt.Printf("[Error] get command error: %v\n", err)
+	}
+	if err := com.Run(); err != nil {
+		fmt.Println("[Error] ", err)
+	}
+	fmt.Println("[Info] blender version:", strings.Split(string(out), "\n")[0])
 
 	client := &Client{
 		serverAddr: serverIP,

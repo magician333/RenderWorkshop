@@ -1,5 +1,5 @@
-# RenderWorkshop
 ![logo](./img/logo.png)
+---
 **RenderWorkshop** is an open source, free distributed rendering tool for [Blender](https://www.blender.org/) that renders single frame images/image sequences using multiple devices, dramatically speeding up rendering, especially for small studios/companies/personal intranet environments with multiple devices.
 
 [中文文档](./README_zh.md)
