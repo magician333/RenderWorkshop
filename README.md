@@ -51,7 +51,8 @@ Image sequence rendering has two modes
  - [x] manager merge image
  - [ ] animation rendering (partitioned rendering)
  - [x] animation rendering (multi-frame rendering)
- - [ ] Add render queue
+ - [x] Add render queue(image)
+ - [ ] Add render queue(animation)
  - [x] worker file packing executable
  - [ ] worker online status feedback
  - [ ] UI active refresh (current UI will not be actively refreshed, you need to move the mouse, etc. to refresh)
