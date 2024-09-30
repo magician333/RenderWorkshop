@@ -11,8 +11,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import threading
+import bpy
+import socket
+from . import utils, Server
+
 bl_info = {
-    "name": "Renderworkshop",
+    "name": "RenderWorkshop",
     "author": "purplefire",
     "description":
     "Implement distributed rendering for blender to speed up rendering",
@@ -23,13 +28,7 @@ bl_info = {
     "category": "Generic",
 }
 
-import os
-import shutil
-import threading
-import time
-import bpy
-import socket
-from . import utils, Server
+
 
 hostname = socket.gethostname()
 ip = socket.gethostbyname(hostname)
@@ -38,11 +37,12 @@ server = Server.Server(host=ip)
 
 class RenderWorkshopMenu(bpy.types.Panel):
     bl_label = "RenderWorkshop"
-    bl_idname = "RENDER_PT_renderworkshop"
+    bl_idname = "object.my_plugin_dialog"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "output"
 
+    
     def draw(self, context):
         layout = self.layout
         scene = context.scene
@@ -64,6 +64,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
                              scene,
                              "Workers_index",
                              type="DEFAULT")
+        
         tab = layout.column().box()
         tabrow = tab.row()
         tabs = tabrow.row()
@@ -102,7 +103,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
             render_setting.operator(RenderAnimatonOperator.bl_idname,
                                     text=RenderAnimatonOperator.bl_label,
                                     icon="FILE_MOVIE")
-        render_setting.enabled = scene.RenderSettingEnable
+        render_setting.enabled = True
 
 
 class StartServerOperator(bpy.types.Operator):
@@ -145,7 +146,6 @@ class WorkerItemList(bpy.types.UIList):
         row = layout.row(align=True)
         row.label(text=item.host)
         row.prop(item, "blendfile", text="")
-
         row.operator(DeleteHostOperator.bl_idname, text="",
                      icon='X').index = index
 
@@ -173,57 +173,11 @@ class RenderImageOperator(bpy.types.Operator):
 
     def execute(self, context):
         if bpy.data.filepath == "":
-            self.report(type="ERROR",
+            self.report(type={"ERROR"},
                         message="Must save file to share storage")
-            return
-        tasklist = []
-        for index, border in enumerate(utils.getborders(context.scene.Tiles)):
-            task = {
-                "index":
-                index,
-                "border":
-                border,
-                "worker":
-                "",
-                "start_time":
-                0,
-                "end_time":
-                0,
-                "complete":
-                False,
-                "lock":
-                None,
-                "frame":
-                [context.scene.frame_current, context.scene.frame_current + 1]
-            }
-            tasklist.append(task)
-
-        workerlist = []
-        for item in context.scene.Workers:
-            worker = {
-                "host": item.host,
-                "render": True,
-                "online": True,
-                "blendfile": item.blendfile.strip('"')
-            }
-            workerlist.append(worker)
-
-        bpy.ops.wm.window_new()
-        area = bpy.context.window_manager.windows[-1].screen.areas[0]
-        area.ui_type = 'IMAGE_EDITOR'
-        outputfilepath = os.path.dirname(bpy.data.filepath)
-        outputfilename = context.scene.name + ".png"
-        context.scene.RenderSettingEnable = False
+            return {"FINISHED"}
         self.report(type={"INFO"}, message="Start Render Image")
-        utils.manage_image_threads(
-            server=server,
-            area=area,
-            tasklist=tasklist,
-            workerlist=workerlist,
-            outputfilepath=outputfilepath,
-            outputfilename=outputfilename,
-        )
-        self.report(type={"INFO"}, message="Render Image Finished")
+        utils.render_image(context=context,server=server)
         return {'FINISHED'}
 
 
@@ -235,46 +189,17 @@ class RenderAnimatonOperator(bpy.types.Operator):
         if bpy.data.filepath == "":
             self.report(type={"ERROR"},
                         message="Must save file to share storage")
-            return
+            return {"FINISHED"}
         start_frame, end_frame = context.scene.FrameStart, context.scene.FrameEnd
         if context.scene.AnimationFun == "Frames":
-            tasklist = []
-            current_start = start_frame
-            index = 0
-            step = context.scene.Frames
-
-            while current_start < end_frame:
-                current_end = min(current_start + step - 1, end_frame)
-                task = {
-                    "index": index,
-                    "border": [0, 1, 0, 1],
-                    "worker": "",
-                    "start_time": 0,
-                    "end_time": 0,
-                    "complete": False,
-                    "lock": None,
-                    "frame_range": [current_start, current_end]
-                }
-                tasklist.append(task)
-                current_start += step
-                index += 1
-
-            workerlist = []
-            for item in context.scene.Workers:
-                worker = {
-                    "host": item.host,
-                    "render": True,
-                    "online": True,
-                    "blendfile": item.blendfile.strip('"')
-                }
-                workerlist.append(worker)
             self.report(type={"INFO"}, message="Start Render Animation")
-            utils.manage_animation_threads(server, tasklist, workerlist)
-            self.report(type={"INFO"}, message="Render Animation Finished")
+            utils.render_animation_frame(context,server,start_frame,end_frame)
         else:
-            self.report(type={"INFO"}, message="Tiles")
+            self.report(type={"INFO"}, message="Render Animation by tiles is coming soon")
+            # utils.render_animation_tiles(context,server,start_frame,end_frame)
 
         return {'FINISHED'}
+
 
 
 def register():
@@ -285,7 +210,7 @@ def register():
     bpy.utils.register_class(RenderImageOperator)
     bpy.utils.register_class(RenderAnimatonOperator)
     bpy.utils.register_class(WorkerItem)
-
+    
     bpy.types.Scene.Workers = bpy.props.CollectionProperty(type=WorkerItem)
     bpy.types.Scene.Workers_index = bpy.props.IntProperty()
     bpy.types.Scene.Tiles = bpy.props.IntProperty(
@@ -326,8 +251,8 @@ def register():
         ("Tiles", "Tiles", "Use Tiles to render animation")
     ],
                                                           default="Frames")
-
-
+    
+        
 def unregister():
     bpy.utils.unregister_class(RenderWorkshopMenu)
     bpy.utils.unregister_class(StartServerOperator)
@@ -346,3 +271,4 @@ def unregister():
     del bpy.types.Scene.FrameEnd
     del bpy.types.Scene.RenderSettingEnable
     del bpy.types.Scene.TabIndex
+    

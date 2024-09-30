@@ -4,7 +4,12 @@ import shutil
 import threading
 import time
 import bpy
+from enum import Enum,auto
 
+class RenderStatus(Enum):
+    PENDING=auto()
+    RENDERING=auto()
+    COMPLETED=auto()
 
 def getborders(num):
     scene = bpy.context.scene
@@ -25,7 +30,7 @@ def getborders(num):
 def merge_image(area, outputfilepath, outputfilename):
     tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
     if not os.path.exists(tempfilepath):
-        print(f"[Error] temp path error")
+        print("[Error] temp path error")
         return
 
     images = []
@@ -70,7 +75,7 @@ def merge_image(area, outputfilepath, outputfilename):
     area.spaces.active.image = image
 
 
-def render_image(server, area, task, worker):
+def image_task(server, area, task, worker):
     scene = bpy.context.scene
     if worker["render"] and worker["online"]:
         print(f"{worker['host']} is rendering tile {task['index']}")
@@ -107,7 +112,7 @@ def render_image(server, area, task, worker):
                 task["worker"] = worker["host"]
                 task["end_time"] = time.time()
                 worker["render"] = True
-                task["complete"] = True
+                task["complete"] = RenderStatus.COMPLETED
         except Exception as e:
             worker["online"] = False
             print(f"[Error] task run error: {e}")
@@ -115,20 +120,23 @@ def render_image(server, area, task, worker):
             task["lock"] = None
 
 
-def worker_image_thread(server, area, tasklist, worker):
-    while any(not task["complete"] for task in tasklist):
+def worker_thread(server, area, tasklist, worker,method):
+    while any(task["complete"] != RenderStatus.COMPLETED for task in tasklist):
         if worker["render"] and worker["online"]:
             for task in tasklist:
-                if not task["complete"] and task["lock"] is None:
+                if task["complete"] == RenderStatus.PENDING and task["lock"] is None:
                     if worker.get("task_lock", None) is None:
                         worker["task_lock"] = threading.Lock()
                     with worker["task_lock"]:
                         if task["lock"] is None:
                             task["lock"] = worker["host"]
-                            render_image(server, area, task, worker)
+                            task["complete"] = RenderStatus.RENDERING
+                            if method=="image":
+                                image_task(server, area, task, worker)
+                            else:
+                                animation_task(server,worker,task)
                             break
         time.sleep(0.1)
-
 
 def manage_image_threads(server, area, tasklist, workerlist, outputfilepath,
                          outputfilename):
@@ -140,25 +148,30 @@ def manage_image_threads(server, area, tasklist, workerlist, outputfilepath,
     else:
         os.mkdir(tempfilepath)
     for worker in workerlist:
-        thread = threading.Thread(target=worker_image_thread,
-                                  args=(server, area, tasklist, worker))
+        thread = threading.Thread(target=worker_thread,
+                                  args=(server, area, tasklist, worker,"image"))
         thread.start()
         threads.append(thread)
 
     def check_threads():
         if any(thread.is_alive() for thread in threads):
             return 1.0
-        bpy.context.scene.RenderSettingEnable = True
         merge_image(area,
                     outputfilepath=outputfilepath,
                     outputfilename=outputfilename)
+        #Clear temp directory and temp image
         shutil.rmtree(tempfilepath)
+        #Clear temp image perview in blender
+        for image in bpy.data.images:
+            if not image.users:
+                bpy.data.images.remove(image)
+                
         return None
 
     bpy.app.timers.register(check_threads)
 
 
-def render_animation(server, worker, task):
+def animation_task(server, worker, task):
     scene = bpy.context.scene
     renderfilepath = os.path.join(os.path.dirname(bpy.data.filepath),
                                   scene.name)
@@ -191,7 +204,7 @@ def render_animation(server, worker, task):
         if status:
             task["worker"] = worker["host"]
             task["end_time"] = time.time()
-            task["complete"] = True
+            task["complete"] = RenderStatus.COMPLETED
             worker["render"] = True
             print(f"[Info] {worker['host']} render image success")
     except Exception as e:
@@ -200,28 +213,12 @@ def render_animation(server, worker, task):
     finally:
         task["lock"] = None
 
-
-def worker_animation_thread(server, tasklist, worker):
-    while any(not task["complete"] for task in tasklist):
-        if worker["render"] and worker["online"]:
-            for task in tasklist:
-                if not task["complete"] and task["lock"] is None:
-                    if worker.get("task_lock", None) is None:
-                        worker["task_lock"] = threading.Lock()
-                    with worker["task_lock"]:
-                        if task["lock"] is None:
-                            task["lock"] = worker["host"]
-                            render_animation(server, worker, task)
-                            break
-        time.sleep(0.1)
-
-
 def manage_animation_threads(server, tasklist, workerlist):
     threads = []
     for worker in workerlist:
         if worker["render"] and worker["online"]:
-            thread = threading.Thread(target=worker_animation_thread,
-                                      args=(server, tasklist, worker))
+            thread = threading.Thread(target=worker_thread,
+                                      args=(server, None,tasklist, worker,"animation"))
             thread.start()
             threads.append(thread)
 
@@ -232,3 +229,178 @@ def manage_animation_threads(server, tasklist, workerlist):
         return None
 
     bpy.app.timers.register(check_threads)
+
+def manage_animation_tiles_threads(server, area, tasklist, workerlist, outputfilepath,
+                                   outputfilename, rendering):
+
+    threads = []
+    tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
+    if os.path.exists(tempfilepath):
+        shutil.rmtree(tempfilepath)
+        os.mkdir(tempfilepath)
+    else:
+        os.mkdir(tempfilepath)
+    for worker in workerlist:
+        thread = threading.Thread(target=worker_thread,
+                                    args=(server, area, tasklist, worker,"image"))
+        thread.start()
+        threads.append(thread)
+
+    def check_threads():
+        nonlocal rendering
+        if any(thread.is_alive() for thread in threads):
+            return 1.0
+        if rendering:
+            merge_image(area, outputfilepath=outputfilepath, outputfilename=outputfilename)
+            shutil.rmtree(tempfilepath)
+            bpy.context.scene.RenderSettingEnable = True
+            rendering=False
+        return None
+
+    bpy.app.timers.register(check_threads)
+    
+def render_image(context,server):
+    tasklist = []
+    for index, border in enumerate(getborders(context.scene.Tiles)):
+        task = {
+            "index":
+            index,
+            "border":
+            border,
+            "worker":
+            "",
+            "start_time":
+            0,
+            "end_time":
+            0,
+            "complete":
+            RenderStatus.PENDING,
+            "lock":
+            None,
+            "frame":
+            [context.scene.frame_current, context.scene.frame_current + 1]
+        }
+        tasklist.append(task)
+
+    workerlist = []
+    for item in context.scene.Workers:
+        worker = {
+            "host": item.host,
+            "render": True,
+            "online": True,
+            "blendfile": item.blendfile.strip('"')
+        }
+        workerlist.append(worker)
+
+    bpy.ops.wm.window_new()
+    area = bpy.context.window_manager.windows[-1].screen.areas[0]
+    area.ui_type = 'IMAGE_EDITOR'
+    outputfilepath = os.path.dirname(bpy.data.filepath)
+    outputfilename = context.scene.name + ".png"
+    context.scene.RenderSettingEnable = False
+    manage_image_threads(
+        server=server,
+        area=area,
+        tasklist=tasklist,
+        workerlist=workerlist,
+        outputfilepath=outputfilepath,
+        outputfilename=outputfilename,
+    )
+    
+def render_animation_frame(context,server,start_frame,end_frame):
+    tasklist = []
+    current_start = start_frame
+    index = 0
+    step = context.scene.Frames # type: ignore
+
+    while current_start < end_frame:
+        current_end = min(current_start + step - 1, end_frame)
+        task = {
+            "index": index,
+            "border": [0, 1, 0, 1],
+            "worker": "",
+            "start_time": 0,
+            "end_time": 0,
+            "complete": RenderStatus.PENDING,
+            "lock": None,
+            "frame_range": [current_start, current_end]
+        }
+        tasklist.append(task)
+        current_start += step
+        index += 1
+
+    workerlist = []
+    for item in context.scene.Workers:
+        worker = {
+            "host": item.host,
+            "render": True,
+            "online": True,
+            "blendfile": item.blendfile.strip('"')
+        }
+        workerlist.append(worker)
+    manage_animation_threads(server, tasklist, workerlist)
+
+def render_animation_tiles(context,server,start_frame,end_frame):
+    tasklist = []
+    for index, border in enumerate(getborders(context.scene.Tiles)):
+        task = {
+            "index":index,
+            "border":border,
+            "worker":"",
+            "start_time":0,
+            "end_time":0,
+            "complete":RenderStatus.PENDING,
+            "lock":None,
+            "frame":[context.scene.frame_current, context.scene.frame_current + 1]
+        }
+        tasklist.append(task)
+
+    workerlist = []
+    for item in context.scene.Workers:
+        worker = {
+            "host": item.host,
+            "render": True,
+            "online": True,
+            "blendfile": item.blendfile.strip('"')
+        }
+        workerlist.append(worker)
+        
+    bpy.ops.wm.window_new()
+    area = bpy.context.window_manager.windows[-1].screen.areas[0]
+    area.ui_type = 'IMAGE_EDITOR'
+    
+    outputfilepath = os.path.join(os.path.dirname(bpy.data.filepath),context.scene.name)
+    
+    if not os.path.exists(outputfilepath):
+        os.mkdir(outputfilepath)
+        
+    rendering=False
+
+    def render_frame(frame):
+        nonlocal rendering
+        if not rendering:
+            context.scene.RenderSettingEnable = False
+            outputfilename = f"{frame:04}.png"
+            rendering = True
+            manage_animation_tiles_threads(
+                server=server,
+                area=area,
+                tasklist=tasklist,
+                workerlist=workerlist,
+                outputfilepath=outputfilepath,
+                outputfilename=outputfilename,
+                rendering=rendering
+            )
+
+
+    def check_rendering():
+        nonlocal current_frame,rendering
+        if current_frame <= end_frame and not rendering:
+            render_frame(current_frame)
+            current_frame += 1
+            return 0.1
+        else:
+            return None
+
+    current_frame = start_frame
+    bpy.app.timers.register(check_rendering)

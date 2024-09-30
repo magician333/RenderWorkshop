@@ -38,7 +38,17 @@ func (c *Client) runClient() {
 	c.running = true
 	fmt.Println("[Success] Connected success")
 }
-
+func sliceToString(floats []float64) string {
+	str := "["
+	for i, f := range floats {
+		if i > 0 {
+			str += ", "
+		}
+		str += fmt.Sprintf("%.2f", f)
+	}
+	str += "]"
+	return str
+}
 func (c *Client) recv() {
 	buffer := make([]byte, 1024)
 	for {
@@ -88,6 +98,7 @@ func (c *Client) recv() {
 
 			if c.flag {
 				fmt.Println("[Info] start render ", c.border)
+				startTime := time.Now().Unix()
 				command := exec.Command(
 					blenderPath, "-b", "--python", "./render.py", "--", c.blendFile, c.scene,
 					"--border",
@@ -99,11 +110,14 @@ func (c *Client) recv() {
 					"--save_path", tempFilename,
 				)
 
-				if err := command.Run(); err == nil {
+				if err := command.Run(); err != nil {
 					fmt.Println(err)
 				}
 				c.conn.Write([]byte(keyTime + ".png"))
-				fmt.Println("[Info] success render image ", c.border, tempFilename)
+				endTime := time.Now().Unix()
+
+				msg := fmt.Sprintf("[Info] success render temp image %s,border:%s,cost %d s", keyTime+".png", sliceToString(c.border), endTime-startTime)
+				fmt.Println(msg)
 			}
 		case "render_animation":
 			blendFilePath := filepath.Dir(c.blendFile)
@@ -113,6 +127,7 @@ func (c *Client) recv() {
 				tempFilename := filepath.Join(tempPath, strconv.Itoa(frame)+".png")
 				if c.flag {
 					fmt.Println("[Info] start render ", frame)
+					startTime := time.Now().Unix()
 					command := exec.Command(
 						blenderPath, "-b", "--python", "./render.py", "--", c.blendFile, c.scene,
 						"--border",
@@ -126,7 +141,9 @@ func (c *Client) recv() {
 					if err := command.Run(); err != nil {
 						fmt.Println("[Error] ", err)
 					}
-					fmt.Println("[Info] success render image ", c.border, tempFilename)
+					endTime := time.Now().Unix()
+					msg := fmt.Sprintf("[Info] success render frame %s,cost %d s", tempFilename, endTime-startTime)
+					fmt.Println(msg)
 				}
 			}
 			c.conn.Write([]byte("success"))

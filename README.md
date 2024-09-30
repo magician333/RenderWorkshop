@@ -6,12 +6,15 @@
 
 Pictures
 ---
-![manager](./img/Image.png)
+![manager](./img/image.png)
 
-![manager-render](./img/Animation.png)
+![manager-render](./img/animation.png)
 
 ![worker](./img/worker.png)
 
+![render_tiles](/img/render%20tiles.png)
+
+![render_frame](/img/render%20frame.png)
 
 How to use
 ---
@@ -48,6 +51,7 @@ Image sequence rendering has two modes
  - [x] manager merge image
  - [ ] animation rendering (partitioned rendering)
  - [x] animation rendering (multi-frame rendering)
+ - [ ] Add render queue
  - [x] worker file packing executable
  - [ ] worker online status feedback
  - [ ] UI active refresh (current UI will not be actively refreshed, you need to move the mouse, etc. to refresh)
