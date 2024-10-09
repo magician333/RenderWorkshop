@@ -14,6 +14,7 @@ Pictures
 
 ![render_animation](/img/worker_animation.png)
 
+![render_tiles](/img/render_tiles.png)
 
 How to use
 ---
@@ -21,7 +22,7 @@ How to use
 2. Place the blend file in a shared directory accessible to all workers.
 3. Open the blend file using blender in manager.
 4. Find RenderWorkshop in the output panel and start the server.
-5. Configure the config file on the worker and run the worker.
+5. Configure the config file on the worker computer and run the worker. if GPU rendering is required, set the "Cycles rendering devices" in blender-edit-preferences-system on the worker computer
    1. server_ip: the IP address of the server (manager)
    2. server_port: port address (manager and worker must be unified)
    3. blender_path:location of the blender executable (absolute address and preferably the same as the blender version of manger))
@@ -59,6 +60,7 @@ Image sequence rendering has two modes
  - [x] animation rendering (multi-frame rendering)
  - [x] Add render queue(image)
  - [x] Add render queue(animation)
+ - [x] Support GPU render(Cycles only)
  - [ ] Support more file formats (Only PNG now)
  - [x] worker file packing executable
  - [ ] worker online status feedback

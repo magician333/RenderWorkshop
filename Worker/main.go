@@ -23,6 +23,7 @@ type Client struct {
 	border     []float64
 	frame      []int
 	flag       bool
+	device     string
 }
 
 func (c *Client) runClient() {
@@ -68,6 +69,7 @@ func (c *Client) recv() {
 		case "sync":
 			c.blendFile = data["blend_file"].(string)
 			c.scene = data["scene"].(string)
+			c.device = data["device"].(string)
 			borderData := data["border"].([]interface{})
 			c.border = make([]float64, len(borderData))
 			for i, v := range borderData {
@@ -107,6 +109,7 @@ func (c *Client) recv() {
 					strconv.FormatFloat(c.border[2], 'f', -1, 64),
 					strconv.FormatFloat(c.border[3], 'f', -1, 64),
 					"--frame_number", strconv.Itoa(c.frame[0]),
+					"--device", c.device,
 					"--save_path", tempFilename,
 				)
 
@@ -134,6 +137,7 @@ func (c *Client) recv() {
 						strconv.FormatFloat(c.border[1], 'f', -1, 64),
 						strconv.FormatFloat(c.border[2], 'f', -1, 64),
 						strconv.FormatFloat(c.border[3], 'f', -1, 64),
+						"--device", c.device,
 						"--frame_number", strconv.Itoa(frame),
 						"--save_path", tempFilename,
 					)

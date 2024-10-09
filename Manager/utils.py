@@ -86,6 +86,7 @@ def image_task(server, area, task, worker):
             "blend_file": worker["blendfile"],
             "scene": task["scene_name"],
             "border": task["border"],
+            "device": worker["device"],
             "frame": task["frame"],
         }
         task["start_time"] = time.time()
@@ -192,6 +193,7 @@ def animation_task(server, worker, task):
     send_data = {
         "flag": "sync",
         "blend_file": worker["blendfile"],
+        "device": worker["device"],
         "scene": task["scene_name"],
         "border": task["border"],
         "frame": task["frame_range"],
@@ -295,6 +297,7 @@ def render_image(context, server, area, scene_name, frame, tiles, callback):
             "host": item.host,
             "render": True,
             "online": True,
+            "device": item.device,
             "blendfile": item.blendfile.strip('"'),
         }
         workerlist.append(worker)
@@ -345,6 +348,7 @@ def render_animation_frame(
             "host": item.host,
             "render": True,
             "online": True,
+            "device": item.device,
             "blendfile": item.blendfile.strip('"'),
         }
         workerlist.append(worker)

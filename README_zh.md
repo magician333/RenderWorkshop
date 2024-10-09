@@ -15,13 +15,15 @@
 
 ![render_animation](/img/worker_animation.png)
 
+![render_tiles](/img/render_tiles.png)
+
 如何使用
 ---
 1. 在文件-外部数据中选择打包资源，并设置好渲染内容（渲染引擎、采样率...）并保存文件
 2. 将blend文件放在所有worker可以访问到的共享目录上
 3. 使用manager的blender打开blend文件
 4. 在输出面板中找到RenderWorkshop，启动服务器
-5. 在worker上配置好config文件，并运行worker
+5. 在worker电脑上配置好config文件，并运行worker；如果需要GPU渲染，请在worker电脑的blender-编辑-偏好设置-系统中设置"Cycles渲染设备"
    1. server_ip:即服务器（manager）的IP地址
    2. server_port:端口地址（manager和worker必须统一）
    3. blender_path:blender可执行文件位置（绝对地址且最好和manger的blender版本相同））
@@ -60,6 +62,7 @@ worker负责渲染manager分发的区域渲染任务，并在渲染完成后将�
  - [x] 动画渲染（多帧渲染）
  - [x] 添加渲染队列（图像）
  - [x] 添加渲染队列（动画）
+ - [x] 支持GPU渲染（仅Cycles）
  - [ ] 支持更多文件格式（目前仅支持PNG）
  - [x] worker文件打包可执行文件
  - [ ] worker在线状态反馈

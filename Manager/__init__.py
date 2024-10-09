@@ -169,7 +169,11 @@ class StartServerOperator(bpy.types.Operator):
 
 class WorkerItem(bpy.types.PropertyGroup):
     host: bpy.props.StringProperty(name="Host")  # type: ignore
-
+    device: bpy.props.EnumProperty(
+        name="devices",
+        items=[("CPU", "CPU", "CPU"), ("GPU", "GPU", "GPU")],
+        description="Only valid when the scene is set to Cycles",
+    )  # type: ignore
     blendfile: bpy.props.StringProperty(name="blendfile")  # type: ignore
 
 
@@ -179,6 +183,7 @@ class WorkerItemList(bpy.types.UIList):
     ):
         row = layout.row(align=True)
         row.label(text=item.host)
+        row.prop(item, "device", text="")
         row.prop(item, "blendfile", text="")
         row.operator(DeleteHostOperator.bl_idname, text="", icon="X").index = index
 
@@ -346,6 +351,7 @@ class RenderAnimatonOperator(bpy.types.Operator):
             self.report(type={"INFO"}, message="Start Render Animation")
             utils.process_scene_list(context, server, None, "animation")
         else:
+            print(context.scene.render)
             self.report(
                 type={"INFO"}, message="Render Animation by tiles is coming soon"
             )
