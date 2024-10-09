@@ -6,15 +6,14 @@
 
 Pictures
 ---
-![manager](/img/image.png)
+![manager](/img/manager_image.png)
 
-![manager-render](/img/animation.png)
-
-![worker](/img/worker.png)
+![manager-render](/img/manager_animation.png)
 
 ![render_image](/img/render_image.png)
 
 ![render_animation](/img/render_animation.png)
+
 
 How to use
 ---
