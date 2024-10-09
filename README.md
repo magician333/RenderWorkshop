@@ -10,9 +10,9 @@ Pictures
 
 ![manager-render](/img/manager_animation.png)
 
-![render_image](/img/render_image.png)
+![render_image](/img/worker_image.png)
 
-![render_animation](/img/render_animation.png)
+![render_animation](/img/worker_animation.png)
 
 
 How to use
