@@ -22,7 +22,7 @@ How to use
 1. Select the packaged resource in File - External Data and set the rendering content (rendering engine, sample rate...) and save the file
 2. Place the blend file in a shared directory accessible to all workers.
 3. Open the blend file using blender in manager.
-4. Find RenderWorkshop in the output panel and start the server.
+4. Find RenderWorkshop in the N panel and start the server.
 5. Configure the config file on the worker computer and run the worker. if GPU rendering is required, set the "Cycles rendering devices" in blender-edit-preferences-system on the worker computer
    1. server_ip: the IP address of the server (manager)
    2. server_port: port address (manager and worker must be unified)

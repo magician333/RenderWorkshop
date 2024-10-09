@@ -23,7 +23,7 @@
 1. 在文件-外部数据中选择打包资源，并设置好渲染内容（渲染引擎、采样率...）并保存文件
 2. 将blend文件放在所有worker可以访问到的共享目录上
 3. 使用manager的blender打开blend文件
-4. 在输出面板中找到RenderWorkshop，启动服务器
+4. 在N面板中找到RenderWorkshop，启动服务器
 5. 在worker计算机上配置好config文件，并运行worker；如果需要GPU渲染，请在worker计算机的blender-编辑-偏好设置-系统中设置"Cycles渲染设备"
    1. server_ip:即服务器（manager）的IP地址
    2. server_port:端口地址（manager和worker必须统一）
