@@ -73,8 +73,9 @@ def merge_image(area, outputfilepath, outputfilename):
     for n in tree.nodes:
         tree.nodes.remove(n)
     bpy.context.scene.use_nodes = False
-    image = bpy.data.images.load(composite_file_path)
-    area.spaces.active.image = image
+    if area:
+        image = bpy.data.images.load(composite_file_path)
+        area.spaces.active.image = image
 
 
 def image_task(server, area, task, worker):
@@ -107,9 +108,9 @@ def image_task(server, area, task, worker):
                 img = os.path.join(
                     os.path.dirname(bpy.data.filepath), "temp", tempfilename
                 )
-
-                image = bpy.data.images.load(img)
-                area.spaces.active.image = image
+                if area:
+                    image = bpy.data.images.load(img)
+                    area.spaces.active.image = image
                 task["worker"] = worker["host"]
                 task["end_time"] = time.time()
                 worker["render"] = True
@@ -191,7 +192,7 @@ def animation_task(server, worker, task):
     send_data = {
         "flag": "sync",
         "blend_file": worker["blendfile"],
-        "scene": scene.name,
+        "scene": task["scene_name"],
         "border": task["border"],
         "frame": task["frame_range"],
     }
@@ -219,7 +220,7 @@ def animation_task(server, worker, task):
         task["lock"] = None
 
 
-def manage_animation_threads(server, tasklist, workerlist):
+def manage_animation_threads(server, tasklist, workerlist, finish_callback):
     threads = []
     for worker in workerlist:
         if worker["render"] and worker["online"]:
@@ -233,6 +234,7 @@ def manage_animation_threads(server, tasklist, workerlist):
         if any(thread.is_alive() for thread in threads):
             return 1.0
         bpy.context.scene.RenderSettingEnable = True
+        finish_callback()
         return None
 
     bpy.app.timers.register(check_threads)
@@ -288,7 +290,7 @@ def render_image(context, server, area, scene_name, frame, tiles, callback):
 
         tasklist.append(task)
     workerlist = []
-    for item in context.scene.Workers:
+    for item in context.scene.Workers_list:
         worker = {
             "host": item.host,
             "render": True,
@@ -311,30 +313,34 @@ def render_image(context, server, area, scene_name, frame, tiles, callback):
     )
 
 
-def render_animation_frame(context, server, start_frame, end_frame):
+def render_animation_frame(
+    context, server, scene_name, start_frame, end_frame, step, callback
+):
     tasklist = []
     current_start = start_frame
     index = 0
-    step = context.scene.Frames  # type: ignore
+    step = step
 
-    while current_start < end_frame:
+    while current_start <= end_frame:
         current_end = min(current_start + step - 1, end_frame)
         task = {
             "index": index,
             "border": [0, 1, 0, 1],
             "worker": "",
+            "scene_name": scene_name,
             "start_time": 0,
             "end_time": 0,
             "complete": RenderStatus.PENDING,
             "lock": None,
             "frame_range": [current_start, current_end],
         }
+        print([current_start, current_end])
         tasklist.append(task)
         current_start += step
         index += 1
 
     workerlist = []
-    for item in context.scene.Workers:
+    for item in context.scene.Workers_list:
         worker = {
             "host": item.host,
             "render": True,
@@ -342,7 +348,12 @@ def render_animation_frame(context, server, start_frame, end_frame):
             "blendfile": item.blendfile.strip('"'),
         }
         workerlist.append(worker)
-    manage_animation_threads(server, tasklist, workerlist)
+    manage_animation_threads(
+        server,
+        tasklist,
+        workerlist,
+        finish_callback=callback,
+    )
 
 
 def render_animation_tiles(context, server, start_frame, end_frame):
@@ -361,7 +372,7 @@ def render_animation_tiles(context, server, start_frame, end_frame):
         tasklist.append(task)
 
     workerlist = []
-    for item in context.scene.Workers:
+    for item in context.scene.Workers_list:
         worker = {
             "host": item.host,
             "render": True,
@@ -412,8 +423,11 @@ def render_animation_tiles(context, server, start_frame, end_frame):
     bpy.app.timers.register(check_rendering)
 
 
-def process_scene_list(context, server, area):
-    scene_items = context.scene.Scene_image_list
+def process_scene_list(context, server, area, method):
+    if "image" == method:
+        scene_items = context.scene.Scene_image_list
+    else:
+        scene_items = context.scene.Scene_animation_list
     index = 0
 
     def process_next():
@@ -425,16 +439,27 @@ def process_scene_list(context, server, area):
                 def on_finish():
                     bpy.app.timers.register(process_next)
 
+                if "image" == method:
+                    render_image(
+                        context=context,
+                        server=server,
+                        area=area,
+                        scene_name=item.scene_name,
+                        frame=item.frame,
+                        tiles=item.tiles,
+                        callback=on_finish,
+                    )
+                else:
+                    render_animation_frame(
+                        context,
+                        server,
+                        scene_name=item.scene_name,
+                        start_frame=item.frame_start,
+                        end_frame=item.frame_end,
+                        step=item.frame_split,
+                        callback=on_finish,
+                    )
                 item.render = False
-                render_image(
-                    context=context,
-                    server=server,
-                    area=area,
-                    scene_name=item.scene_name,
-                    frame=item.frame,
-                    tiles=item.tiles,
-                    callback=on_finish,
-                )
             else:
                 index += 1
                 return 0.1

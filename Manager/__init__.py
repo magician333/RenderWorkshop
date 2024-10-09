@@ -58,9 +58,9 @@ class RenderWorkshopMenu(bpy.types.Panel):
         layout.separator()
         layout.template_list(
             "WorkerItemList",
-            "Workers",
+            "Workers_list",
             scene,
-            "Workers",
+            "Workers_list",
             scene,
             "Workers_index",
             type="DEFAULT",
@@ -74,7 +74,10 @@ class RenderWorkshopMenu(bpy.types.Panel):
 
         if scene.TabIndex == "Image":
             render_setting = tab.column()
-
+            render_setting.prop(scene, "ShowImagePreview", text="Show Image Preview")
+            render_setting.label(
+                text="Can't render without setting camera", icon="INFO"
+            )
             render_setting.template_list(
                 "SCENE_IMAGE_UL_scene_list",
                 "",
@@ -99,6 +102,8 @@ class RenderWorkshopMenu(bpy.types.Panel):
 
         elif scene.TabIndex == "Animation":
             render_setting = tab.column()
+            render_setting.separator()
+
             animation_tab = render_setting.column()
             animation_tab_row = animation_tab.row()
             animation_tabs = animation_tab_row.row()
@@ -107,25 +112,20 @@ class RenderWorkshopMenu(bpy.types.Panel):
             animation_tabs.prop(scene, "AnimationFun", text="Render Method")
 
             if scene.AnimationFun == "Frames":
-                render_setting.separator()
-                render_setting.prop(scene, "Frames", text="Frame Split")
+                render_setting.label(
+                    text="Can't render without setting camera", icon="INFO"
+                )
+                render_setting.template_list(
+                    "SCENE_ANIMATION_UL_scene_list",
+                    "SceneAnimationItem",
+                    scene,
+                    "Scene_animation_list",
+                    scene,
+                    "Scene_animation_index",
+                    type="DEFAULT",
+                )
             elif scene.AnimationFun == "Tiles":
                 render_setting.separator()
-                # render_setting.prop(scene, "Tiles", text="Tile Split")
-            render_setting.separator()
-            frame_row = render_setting.row()
-
-            frame_row.prop(scene, "FrameStart", text="Frame Start")
-            frame_row.prop(scene, "FrameEnd", text="Frame End")
-            render_setting.template_list(
-                "SCENE_ANIMATION_UL_scene_list",
-                "SceneAnimationItem",
-                scene,
-                "Scene_animation_list",
-                scene,
-                "Scene_animation_index",
-                type="DEFAULT",
-            )
             render_setting.separator()
             render_button = render_setting.row()
             render_button.operator(
@@ -192,11 +192,11 @@ class DeleteHostOperator(bpy.types.Operator):
     def execute(self, context):
         scene = context.scene
 
-        item = scene.Workers[self.index]
+        item = scene.Workers_list[self.index]
         server.del_host_from_list(item.host)
         self.report({"INFO"}, f"{item.host} closed.")
 
-        scene.Workers.remove(self.index)
+        scene.Workers_list.remove(self.index)
         return {"FINISHED"}
 
 
@@ -283,7 +283,6 @@ class SCENE_ANIMATION_UL_scene_list(bpy.types.UIList):
         row.prop(item, "frame_start", text="Start")
         row.prop(item, "frame_end", text="End")
         row.prop(item, "frame_split", text="Frame Split")
-
         row.enabled = item.enabled
 
 
@@ -291,15 +290,32 @@ class RenderImageOperator(bpy.types.Operator):
     bl_idname = "render.render_image"
     bl_label = "Render Image"
 
+    def has_select(self):
+        for i in bpy.context.scene.Scene_image_list:
+            if i.render:
+                return True
+        return False
+
     def execute(self, context):
+        area = None
         if bpy.data.filepath == "":
             self.report(type={"ERROR"}, message="Must save file to share storage")
             return {"FINISHED"}
+        if len(context.scene.Workers_list) == 0:
+            self.report(type={"ERROR"}, message="No workers available")
+            return {"FINISHED"}
+        if not self.has_select():
+            self.report(type={"ERROR"}, message="No scene selected for rendering")
+            return {"FINISHED"}
+
         self.report(type={"INFO"}, message="Start Render Image")
-        bpy.ops.wm.window_new()
-        area = bpy.context.window_manager.windows[-1].screen.areas[0]
-        area.ui_type = "IMAGE_EDITOR"
-        utils.process_scene_list(context=context, server=server, area=area)
+        if context.scene.ShowImagePreview:
+            bpy.ops.wm.window_new()
+            area = bpy.context.window_manager.windows[-1].screen.areas[0]
+            area.ui_type = "IMAGE_EDITOR"
+        utils.process_scene_list(
+            context=context, server=server, area=area, method="image"
+        )
         return {"FINISHED"}
 
 
@@ -307,14 +323,28 @@ class RenderAnimatonOperator(bpy.types.Operator):
     bl_idname = "render.render_animation"
     bl_label = "Render Animation"
 
+    def has_select(self):
+        for i in bpy.context.scene.Scene_animation_list:
+            if i.render:
+                return True
+        return False
+
     def execute(self, context):
         if bpy.data.filepath == "":
             self.report(type={"ERROR"}, message="Must save file to share storage")
             return {"FINISHED"}
-        start_frame, end_frame = context.scene.FrameStart, context.scene.FrameEnd
+        if len(context.scene.Workers_list) == 0:
+            self.report(type={"ERROR"}, message="No workers available")
+            return {"FINISHED"}
+        if not self.has_select():
+            self.report(type={"ERROR"}, message="No scene selected for rendering")
+            return {"FINISHED"}
+        # bpy.ops.wm.window_new()
+        # area = bpy.context.window_manager.windows[-1].screen.areas[0]
+        # area.ui_type = "FILES"
         if context.scene.AnimationFun == "Frames":
             self.report(type={"INFO"}, message="Start Render Animation")
-            utils.render_animation_frame(context, server, start_frame, end_frame)
+            utils.process_scene_list(context, server, None, "animation")
         else:
             self.report(
                 type={"INFO"}, message="Render Animation by tiles is coming soon"
@@ -340,12 +370,14 @@ def register():
 
     bpy.types.Scene.Scene_image_list = bpy.props.CollectionProperty(type=SceneImageItem)
     bpy.types.Scene.Scene_image_index = bpy.props.IntProperty()
+    bpy.types.Scene.ShowImagePreview = bpy.props.BoolProperty(
+        name="ImagePreview", default=True
+    )
     bpy.types.Scene.Scene_animation_list = bpy.props.CollectionProperty(
         type=SceneAnimationItem
     )
     bpy.types.Scene.Scene_animation_index = bpy.props.IntProperty()
-
-    bpy.types.Scene.Workers = bpy.props.CollectionProperty(type=WorkerItem)
+    bpy.types.Scene.Workers_list = bpy.props.CollectionProperty(type=WorkerItem)
     bpy.types.Scene.Workers_index = bpy.props.IntProperty()
 
     bpy.types.Scene.Frames = bpy.props.IntProperty(
@@ -401,7 +433,7 @@ def unregister():
     bpy.utils.unregister_class(SceneAnimationItem)
     bpy.utils.unregister_class(SCENE_ANIMATION_UL_scene_list)
 
-    del bpy.types.Scene.Workers
+    del bpy.types.Scene.Workers_list
     del bpy.types.Scene.Workers_index
     del bpy.types.Scene.Frames
     del bpy.types.Scene.Host

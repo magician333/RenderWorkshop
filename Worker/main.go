@@ -180,7 +180,6 @@ func main() {
 		fmt.Printf("[Error] get command error: %v\n", err)
 	}
 	if err := com.Run(); err != nil {
-		fmt.Println("[Error] ", err)
 	}
 	fmt.Println("[Info] blender version:", strings.Split(string(out), "\n")[0])
 

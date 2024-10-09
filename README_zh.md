@@ -1,40 +1,46 @@
 ![logo](./img/logo.png)
 ---
-**RenderWorkshop** 是适用于 [Blender](https://www.blender.org/) 的开源免费的分布式渲染工具，使用多台设备渲染单帧图像/图像序列，大幅加快渲染速度，尤其适用于拥有多设备的小型工作室/公司/个人内网环境。
+**RenderWorkshop** 是适用于 [Blender](https://www.blender.org/) 的开源的分布式渲染工具，使用多台设备渲染单帧图像/图像序列，大幅加快渲染速度，尤其适用于拥有多设备的小型工作室/公司/个人内网环境。
 
 [English Docs](./README.md)
 
 图片
 ---
 
+![manager](/img/image.png)
 
-![manager](./img/image.png)
+![manager-render](/img/animation.png)
 
-![manager-render](./img/animation.png)
+![worker](/img/worker.png)
 
-![worker](./img/worker.png)
+![render_image](/img/render_image.png)
 
-![render_tiles](/img/render%20tiles.png)
-
-![render_frame](/img/render%20frame.png)
+![render_animation](/img/render_animation.png)
 
 如何使用
 ---
-1.在文件-外部数据中选择打包资源，并设置好渲染内容（渲染引擎、采样率...）并保存文件
-2.将blend文件放在所有worker可以访问到的共享目录上
-3.使用manager的blender打开blend文件
-4.在输出面板中找到RenderWorkshop，启动服务器
-5.在worker上配置好config文件，并运行worker
-6.manger的参数列表将会出现已连接的worker
-7.在worker列表中设置他们访问blend文件的位置（比如worker1为X:/render/test.blend，worker2为Z:/render/test.blend。最好设置一个统一的网络路径，比如//192.168.0.100/render）
-8.点击渲染，等待渲染结果
+1. 在文件-外部数据中选择打包资源，并设置好渲染内容（渲染引擎、采样率...）并保存文件
+2. 将blend文件放在所有worker可以访问到的共享目录上
+3. 使用manager的blender打开blend文件
+4. 在输出面板中找到RenderWorkshop，启动服务器
+5. 在worker上配置好config文件，并运行worker
+   1. server_ip:即服务器（manager）的IP地址
+   2. server_port:端口地址（manager和worker必须统一）
+   3. blender_path:blender可执行文件位置（绝对地址且最好和manger的blender版本相同））
+6. manger的参数列表将会出现已连接的worker
+7. 在worker列表中设置他们访问blend文件的位置（比如worker1为X:/render/test.blend，worker2为Z:/render/test.blend。最好设置一个统一的网络路径，比如//192.168.0.100/render）
+8. 点击刷新场景列表，选择需要渲染的场景，设置相应参数
+   1. 如果是渲染图像，设置渲染的帧（默认为场景当前帧）和切片数量，建议切片数量2-10
+   2. 如果是渲染动画(帧范围)，设置渲染的起始帧和结束帧，设置每个任务需要渲染的帧数（如起始帧设置为1，结束帧设置为10，渲染的帧数设置为3，则会分割为四个任务(1-3,4-6,7-9,10)分配给worker）
+   3. 如果是渲染动画（图像分块），设置渲染的起始帧和结束帧和切片数量，建议切片数量2-10
+9.  点击渲染，如果是图像，则会将图像保存到blend文件目录下，文件名为场景名；如果是动画，则会将图像序列保存到blend文件目录下的文件夹下，文件夹名为场景名（注：暂时只支持png格式）
 
 工作原理
 ---
 RenderWorkshop分为manager和worker两部分。
 
 ### 对于图像
-manager获取需要渲染的文件并计算区域渲染的范围（tiles），制定区域渲染的渲染任务，连接 worker 主机，并将任务分配给可用的 worker。
+manager获取需要渲染的文件并计算区域渲染的分块（tiles），制定区域渲染的渲染任务，连接 worker 主机，并将任务分配给可用的 worker。
 worker负责渲染manager分发的区域渲染任务，并在渲染完成后将任务发送给manager，然后 “领取 ”下一个任务。
 图像的所有区域渲染完成后，manager会使用 blender 合成器将所有分区合并成完整的图像。
 
@@ -54,8 +60,9 @@ worker负责渲染manager分发的区域渲染任务，并在渲染完成后将�
  - [x] manager图像拼接及展示
  - [ ] 动画渲染（分区渲染）
  - [x] 动画渲染（多帧渲染）
- - [x] 添加渲染队列(图像)
- - [ ] 添加渲染队列(动画)
+ - [x] 添加渲染队列（图像）
+ - [x] 添加渲染队列（动画）
+ - [ ] 支持更多文件格式（目前仅支持PNG）
  - [x] worker文件打包可执行文件
  - [ ] worker在线状态反馈
  - [ ] 界面UI主动刷新（当前UI界面不会主动刷新，需要移动鼠标等方式进行刷新）

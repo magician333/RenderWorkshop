@@ -4,7 +4,6 @@ import socket
 
 
 class Server:
-
     def __init__(self, host="127.0.0.1", port=9815):
         self.host = host
         self.port = port
@@ -37,8 +36,9 @@ class Server:
                     break
                 self.conn_list[addr[0]] = conn
                 self.add_host_to_list(addr[0])
-                threading.Thread(target=self.handle_client,
-                                 args=(conn, addr[0])).start()
+                threading.Thread(
+                    target=self.handle_client, args=(conn, addr[0])
+                ).start()
 
             except socket.error as e:
                 print(f"[Error] runserver error:{e}")
@@ -49,7 +49,7 @@ class Server:
 
     def add_host_to_list(self, host):
         scene = bpy.context.scene
-        new_item = scene.Workers.add()
+        new_item = scene.Workers_list.add()
         new_item.host = host
 
     def del_host_from_list(self, client_address):
@@ -93,7 +93,7 @@ class Server:
         self.running = False
         for ip in self.conn_list:
             self.conn_list[ip].close()
-            context.scene.Workers.clear()
+            context.scene.Workers_list.clear()
         self.conn_list = {}
         if self.sock:
             self.sock.close()
