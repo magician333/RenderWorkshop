@@ -18,6 +18,7 @@ Pictures
 
 How to use
 ---
+***!!!Please ensure that the rendering is set to not automatically hibernate on all computers involved in the rendering***
 1. Select the packaged resource in File - External Data and set the rendering content (rendering engine, sample rate...) and save the file
 2. Place the blend file in a shared directory accessible to all workers.
 3. Open the blend file using blender in manager.
@@ -31,8 +32,7 @@ How to use
 8. Click to refresh the scene list, select the scene to be rendered, and set the corresponding parameters.
    1. if you are rendering an image, set the frame to be rendered (the default is the current frame of the scene) and the number of tiles, the recommended number of tiles is 2-10
    2. if rendering animation (frame range), set the start frame and end frame of rendering, set the number of frames to be rendered for each task (e.g., if the start frame is set to 1, the end frame is set to 10, and the number of frames to be rendered is set to 3, then it will be divided into four tasks (1-3, 4-6, 7-9, 10) to be assigned to the worker)
-   3. if it is rendering animation (image tiles), set the start frame and end frame of rendering and the number of tiles, it is recommended that the number of tiles 2-10
-9. click render, if it is an image, it will save the image to the blend file directory, the file name is the scene name; if it is an animation, it will save the image sequence to the folder under the blend file directory, the folder name is the scene name (Note: only png format is supported for the time being)
+9. click render, if it is an image, it will save the image to the blend file directory, the file name is the scene name; if it is an animation, it will save the image sequence to the folder under the blend file directory, the folder name is the scene name
 
 Working Principle
 ---
@@ -44,9 +44,7 @@ The worker is responsible for rendering the area rendering tasks distributed by 
 After all regions of the image have been rendered, the manger will use the blender compositor to merge all the tiles into a complete image.
 
 ### For Image sequence (Video)
-Image sequence rendering has two modes
-1. You can choose the same slice rendering mode as for images, where each frame is distributed to all workers for rendering (the current frame is rendered before the next one is rendered)
-2. You can choose to set different frame ranges for different workers, similar to [Flamenco](https://flamenco.blender.org/).
+1. You can choose to set different frame ranges for different workers, similar to [Flamenco](https://flamenco.blender.org/).
 
 
 ### Development progress
@@ -56,11 +54,11 @@ Image sequence rendering has two modes
  - [x] manger slicing and task distribution
  - [x] worker image return
  - [x] manager merge image
- - [ ] animation rendering (partitioned rendering)
  - [x] animation rendering (multi-frame rendering)
  - [x] Add render queue(image)
  - [x] Add render queue(animation)
  - [x] Support GPU render(Cycles only)
+ - [x] Add Info List
  - [ ] Support more file formats (Only PNG now)
  - [x] worker file packing executable
  - [ ] worker online status feedback

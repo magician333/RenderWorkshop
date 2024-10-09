@@ -22,11 +22,8 @@ class Server:
 
         except Exception as e:
             print(f"[Error] server error:{e}")
-            try:
-                self.sock.close()
-            except Exception as e:
-                print(f"[Error] close server error:{e}")
-                context.scene.ServerStatus = "Server cause error"
+            self.sock.close()
+            context.scene.ServerStatus = "Server cause error"
 
         while self.running:
             try:
@@ -41,6 +38,8 @@ class Server:
                 ).start()
 
             except socket.error as e:
+                item = bpy.context.scene.Scene_Msg_list.add()
+                item.msg = f"[Error] runserver error:{e}"
                 print(f"[Error] runserver error:{e}")
                 break
 
@@ -57,6 +56,8 @@ class Server:
             self.conn_list[client_address].close()
             del self.conn_list[client_address]
         except Exception as e:
+            item = bpy.context.scene.Scene_Msg_list.add()
+            item.msg = f"[Error] delete host error:{e}"
             print(f"[Error] delete host error:{e}")
 
     def handle_client(self, conn, addr):
@@ -69,6 +70,8 @@ class Server:
                     else:
                         print(data)
                 except Exception as e:
+                    item = bpy.context.scene.Scene_Msg_list.add()
+                    item.msg = f"[Error] connect error: {e}"
                     print(f"[Error] connect error: {e}")
                     break
 
@@ -77,6 +80,8 @@ class Server:
             conn = self.conn_list[addr]
             conn.sendall(data)
         except Exception as e:
+            item = bpy.context.scene.Scene_Msg_list.add()
+            item.msg = "[Error] send data error", e
             print("[Error] send data error", e)
 
     def recv_data(self, addr):
@@ -85,6 +90,8 @@ class Server:
             data = conn.recv(1024)
             return data.decode("utf-8")
         except Exception as e:
+            item = bpy.context.scene.Scene_Msg_list.add()
+            item.msg = f"[Error] recv data error:{e}"
             print(f"[Error] recv data error:{e}")
 
     def stop_server(self):

@@ -32,7 +32,8 @@ def getborders(num):
 def merge_image(area, outputfilepath, outputfilename):
     tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
     if not os.path.exists(tempfilepath):
-        print("[Error] temp path error")
+        item = bpy.context.scene.Scene_Msg_list.add()
+        item.msg = "[Error] temp path error"
         return
 
     images = []
@@ -80,7 +81,8 @@ def merge_image(area, outputfilepath, outputfilename):
 
 def image_task(server, area, task, worker):
     if worker["render"] and worker["online"]:
-        print(f"{worker['host']} is rendering tile {task['index']}")
+        item = bpy.context.scene.Scene_Msg_list.add()
+        item.msg = f"{worker['host']} is rendering tile {task['index']}"
         send_data = {
             "flag": "sync",
             "blend_file": worker["blendfile"],
@@ -118,7 +120,8 @@ def image_task(server, area, task, worker):
                 task["complete"] = RenderStatus.COMPLETED
         except Exception as e:
             worker["online"] = False
-            print(f"[Error] task run error: {e}")
+            item = bpy.context.scene.Scene_Msg_list.add()
+            item.msg = f"[Error] task run error: {e}"
         finally:
             task["lock"] = None
 
@@ -188,8 +191,8 @@ def animation_task(server, worker, task):
 
     if not os.path.exists(renderfilepath):
         os.mkdir(renderfilepath)
-
-    print(f"{worker['host']} is rendering")
+    item = bpy.context.scene.Scene_Msg_list.add()
+    item.msg = f"{worker['host']} is rendering"
     send_data = {
         "flag": "sync",
         "blend_file": worker["blendfile"],
@@ -214,10 +217,12 @@ def animation_task(server, worker, task):
             task["end_time"] = time.time()
             task["complete"] = RenderStatus.COMPLETED
             worker["render"] = True
-            print(f"[Info] {worker['host']} render image success")
+            item = bpy.context.scene.Scene_Msg_list.add()
+            item.msg = f"[Info] {worker['host']} render image success"
     except Exception as e:
         worker["online"] = False
-        print(f"[Error] Task run error: {e}")
+        item = bpy.context.scene.Scene_Msg_list.add()
+        item.msg = f"[Error] Task run error: {e}"
     finally:
         task["lock"] = None
 
@@ -243,7 +248,13 @@ def manage_animation_threads(server, tasklist, workerlist, finish_callback):
 
 
 def manage_animation_tiles_threads(
-    server, area, tasklist, workerlist, outputfilepath, outputfilename, rendering
+    server,
+    area,
+    tasklist,
+    workerlist,
+    outputfilepath,
+    outputfilename,
+    rendering,
 ):
     threads = []
     tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
@@ -337,7 +348,6 @@ def render_animation_frame(
             "lock": None,
             "frame_range": [current_start, current_end],
         }
-        print([current_start, current_end])
         tasklist.append(task)
         current_start += step
         index += 1
@@ -360,7 +370,7 @@ def render_animation_frame(
     )
 
 
-def render_animation_tiles(context, server, start_frame, end_frame):
+def render_animation_tiles(context, server, start_frame, end_frame, render_finish):
     tasklist = []
     for index, border in enumerate(getborders(context.scene.Tiles)):
         task = {
@@ -404,6 +414,7 @@ def render_animation_tiles(context, server, start_frame, end_frame):
             context.scene.RenderSettingEnable = False
             outputfilename = f"{frame:04}.png"
             rendering = True
+
             manage_animation_tiles_threads(
                 server=server,
                 area=area,
@@ -412,12 +423,18 @@ def render_animation_tiles(context, server, start_frame, end_frame):
                 outputfilepath=outputfilepath,
                 outputfilename=outputfilename,
                 rendering=rendering,
+                render_finish=render_finish,
             )
 
     def check_rendering():
         nonlocal current_frame, rendering
         if current_frame <= end_frame and not rendering:
-            render_frame(current_frame)
+
+            def render_finish():
+                nonlocal current_frame
+                bpy.app.timers.register(render_frame(current_frame))
+
+            render_frame(current_frame, render_finish)
             current_frame += 1
             return 0.1
         else:

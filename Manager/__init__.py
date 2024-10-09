@@ -37,9 +37,10 @@ server = Server.Server(host=ip)
 class RenderWorkshopMenu(bpy.types.Panel):
     bl_label = "RenderWorkshop"
     bl_idname = "renderworkshop"
-    bl_space_type = "PROPERTIES"
-    bl_region_type = "WINDOW"
-    bl_context = "output"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "RenderWorkshop"
+    # bl_context = "scene"
 
     def draw(self, context):
         layout = self.layout
@@ -65,6 +66,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
             "Workers_index",
             type="DEFAULT",
         )
+
         layout.separator(type="LINE")
 
         tab = layout.column().box()
@@ -74,10 +76,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
 
         if scene.TabIndex == "Image":
             render_setting = tab.column()
-            render_setting.prop(scene, "ShowImagePreview", text="Show Image Preview")
-            render_setting.label(
-                text="Can't render without setting camera", icon="INFO"
-            )
+            render_setting.prop(scene, "ShowImagePreview", text="Preview")
             render_setting.template_list(
                 "SCENE_IMAGE_UL_scene_list",
                 "",
@@ -102,31 +101,19 @@ class RenderWorkshopMenu(bpy.types.Panel):
 
         elif scene.TabIndex == "Animation":
             render_setting = tab.column()
+
+            render_setting.template_list(
+                "SCENE_ANIMATION_UL_scene_list",
+                "SceneAnimationItem",
+                scene,
+                "Scene_animation_list",
+                scene,
+                "Scene_animation_index",
+                type="DEFAULT",
+            )
+
             render_setting.separator()
 
-            animation_tab = render_setting.column()
-            animation_tab_row = animation_tab.row()
-            animation_tabs = animation_tab_row.row()
-            animation_tabs.alignment = "CENTER"
-
-            animation_tabs.prop(scene, "AnimationFun", text="Render Method")
-
-            if scene.AnimationFun == "Frames":
-                render_setting.label(
-                    text="Can't render without setting camera", icon="INFO"
-                )
-                render_setting.template_list(
-                    "SCENE_ANIMATION_UL_scene_list",
-                    "SceneAnimationItem",
-                    scene,
-                    "Scene_animation_list",
-                    scene,
-                    "Scene_animation_index",
-                    type="DEFAULT",
-                )
-            elif scene.AnimationFun == "Tiles":
-                render_setting.separator()
-            render_setting.separator()
             render_button = render_setting.row()
             render_button.operator(
                 RefreshSceneImageListOperator.bl_idname,
@@ -138,7 +125,34 @@ class RenderWorkshopMenu(bpy.types.Panel):
                 text=RenderAnimatonOperator.bl_label,
                 icon="FILE_MOVIE",
             )
-        render_setting.enabled = True
+        render_setting.enabled = True  # Toggle render protect
+
+        layout.separator(type="LINE")
+        message = layout.box()
+
+        message_button = message.row()
+        message_button.operator(
+            DisplayMsgListOperator.bl_idname,
+            text="",
+            icon="DISCLOSURE_TRI_DOWN"
+            if scene.Display_Msg_list
+            else "DISCLOSURE_TRI_RIGHT",
+        )
+        message_button.label(text="Info")
+
+        if scene.Display_Msg_list:
+            message.operator(
+                ClearMsgListOperator.bl_idname, text=ClearMsgListOperator.bl_label
+            )
+            message.template_list(
+                "Msg_list",
+                "",
+                scene,
+                "Scene_Msg_list",
+                scene,
+                "Scene_Msg_index",
+                type="DEFAULT",
+            )
 
 
 class StartServerOperator(bpy.types.Operator):
@@ -205,6 +219,39 @@ class DeleteHostOperator(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class MsgItem(bpy.types.PropertyGroup):
+    msg: bpy.props.StringProperty(
+        name="Render Message", description="Show Render Message"
+    )  # type: ignore
+
+
+class Msg_list(bpy.types.UIList):
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index
+    ):
+        row = layout.row(align=True)
+        row.label(text=item.msg, translate=False)
+
+
+class ClearMsgListOperator(bpy.types.Operator):
+    bl_idname = "render.clearmessage"
+    bl_label = "Clear"
+
+    def execute(self, context):
+        context.scene.Scene_Msg_list.clear()
+        self.report(type={"INFO"}, message="Message Cleared")
+        return {"FINISHED"}
+
+
+class DisplayMsgListOperator(bpy.types.Operator):
+    bl_idname = "render.displaymessagelist"
+    bl_label = "Display Message List"
+
+    def execute(self, context):
+        context.scene.Display_Msg_list = not context.scene.Display_Msg_list
+        return {"FINISHED"}
+
+
 class RefreshSceneImageListOperator(bpy.types.Operator):
     bl_idname = "render.refresh_image_scene"
     bl_label = "Refresh Scene"
@@ -241,7 +288,9 @@ class SceneImageItem(bpy.types.PropertyGroup):
     render: bpy.props.BoolProperty(
         name="Render", default=False, description="Check the item to render"
     )  # type: ignore
-    scene_name: bpy.props.StringProperty(name="Scene name")  # type: ignore
+    scene_name: bpy.props.StringProperty(
+        name="Scene name", description="Can't render without setting camera"
+    )  # type: ignore
     frame: bpy.props.IntProperty(name="Frame", description="Set render frame")  # type: ignore
     tiles: bpy.props.IntProperty(
         name="Tiles", min=2, max=10, description="Set tiles to render"
@@ -269,7 +318,9 @@ class SceneAnimationItem(bpy.types.PropertyGroup):
     render: bpy.props.BoolProperty(
         name="Render", default=False, description="Check the item to render"
     )  # type: ignore
-    scene_name: bpy.props.StringProperty(name="Scene name", description="Scene Name")  # type: ignore
+    scene_name: bpy.props.StringProperty(
+        name="Scene name", description="Can't render without setting camera"
+    )  # type: ignore
     frame_start: bpy.props.IntProperty(name="Start", description="Set start Frame")  # type: ignore
     frame_end: bpy.props.IntProperty(name="End", description="Set end Frame")  # type: ignore
     frame_split: bpy.props.IntProperty(
@@ -344,18 +395,8 @@ class RenderAnimatonOperator(bpy.types.Operator):
         if not self.has_select():
             self.report(type={"ERROR"}, message="No scene selected for rendering")
             return {"FINISHED"}
-        # bpy.ops.wm.window_new()
-        # area = bpy.context.window_manager.windows[-1].screen.areas[0]
-        # area.ui_type = "FILES"
-        if context.scene.AnimationFun == "Frames":
-            self.report(type={"INFO"}, message="Start Render Animation")
-            utils.process_scene_list(context, server, None, "animation")
-        else:
-            print(context.scene.render)
-            self.report(
-                type={"INFO"}, message="Render Animation by tiles is coming soon"
-            )
-            # utils.render_animation_tiles(context,server,start_frame,end_frame)
+        self.report(type={"INFO"}, message="Start Render Animation")
+        utils.process_scene_list(context, server, None, "animation")
 
         return {"FINISHED"}
 
@@ -368,21 +409,36 @@ def register():
     bpy.utils.register_class(RenderImageOperator)
     bpy.utils.register_class(RenderAnimatonOperator)
     bpy.utils.register_class(WorkerItem)
+    bpy.utils.register_class(MsgItem)
+    bpy.utils.register_class(Msg_list)
+    bpy.utils.register_class(ClearMsgListOperator)
+    bpy.utils.register_class(DisplayMsgListOperator)
     bpy.utils.register_class(SceneImageItem)
     bpy.utils.register_class(SCENE_IMAGE_UL_scene_list)
     bpy.utils.register_class(RefreshSceneImageListOperator)
     bpy.utils.register_class(SceneAnimationItem)
     bpy.utils.register_class(SCENE_ANIMATION_UL_scene_list)
 
+    bpy.types.Scene.Scene_Msg_list = bpy.props.CollectionProperty(type=MsgItem)
+    bpy.types.Scene.Scene_Msg_index = bpy.props.IntProperty(
+        name="Render Message", description="Show render message"
+    )
+    bpy.types.Scene.Display_Msg_list = bpy.props.BoolProperty(
+        name="Display Message", default=True
+    )
     bpy.types.Scene.Scene_image_list = bpy.props.CollectionProperty(type=SceneImageItem)
-    bpy.types.Scene.Scene_image_index = bpy.props.IntProperty()
+    bpy.types.Scene.Scene_image_index = bpy.props.IntProperty(
+        name="Scene Name", description="Can't render without setting camera"
+    )
     bpy.types.Scene.ShowImagePreview = bpy.props.BoolProperty(
         name="ImagePreview", default=True
     )
     bpy.types.Scene.Scene_animation_list = bpy.props.CollectionProperty(
         type=SceneAnimationItem
     )
-    bpy.types.Scene.Scene_animation_index = bpy.props.IntProperty()
+    bpy.types.Scene.Scene_animation_index = bpy.props.IntProperty(
+        name="Scene Name", description="Can't render without setting camera"
+    )
     bpy.types.Scene.Workers_list = bpy.props.CollectionProperty(type=WorkerItem)
     bpy.types.Scene.Workers_index = bpy.props.IntProperty()
 
@@ -433,6 +489,10 @@ def unregister():
     bpy.utils.unregister_class(RenderImageOperator)
     bpy.utils.unregister_class(RenderAnimatonOperator)
     bpy.utils.unregister_class(WorkerItem)
+    bpy.utils.unregister_class(MsgItem)
+    bpy.utils.unregister_class(Msg_list)
+    bpy.utils.unregister_class(ClearMsgListOperator)
+    bpy.utils.unregister_class(DisplayMsgListOperator)
     bpy.utils.unregister_class(SceneImageItem)
     bpy.utils.unregister_class(SCENE_IMAGE_UL_scene_list)
     bpy.utils.unregister_class(RefreshSceneImageListOperator)
@@ -451,3 +511,6 @@ def unregister():
     del bpy.types.Scene.Scene_image_index
     del bpy.types.Scene.Scene_animation_list
     del bpy.types.Scene.Scene_animation_index
+    del bpy.types.Scene.Scene_Msg_list
+    del bpy.types.Scene.Scene_Msg_index
+    del bpy.types.Scene.Display_Msg_list
