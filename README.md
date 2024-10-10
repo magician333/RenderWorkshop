@@ -59,6 +59,7 @@ Workers handle the frame range rendering tasks assigned by the manager, similar 
 - [x] Render queue added for images and animations
 - [x] GPU rendering support (Cycles only)
 - [x] Info List added
+- [x] Render animation support check missing frames and re-render it
 - [ ] Expanded file format support (currently PNG only)
 - [x] Worker file packaging for executables
 - [ ] Real-time worker status feedback

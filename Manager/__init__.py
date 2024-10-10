@@ -64,20 +64,20 @@ class RenderWorkshopMenu(bpy.types.Panel):
             scene,
             "Workers_index",
             type="DEFAULT",
+            sort_lock=True,
         )
 
         layout.separator(type="LINE")
-        render_head = layout.row()
-        render_head.label(icon="RENDER_STILL")
-        render_head.label(text="Render")
 
         tab = layout.column().box()
+        render_head = tab.row()
+        render_head.label(icon="RENDER_STILL")
+        render_head.label(text="Render")
         tabrow = tab.row()
         tabs = tabrow.row()
         tabs.prop(context.scene, "TabIndex", expand=True)
-
+        render_setting = tab.column()
         if scene.TabIndex == "Image":
-            render_setting = tab.column()
             render_setting.template_list(
                 "SCENE_IMAGE_UL_scene_list",
                 "",
@@ -87,8 +87,9 @@ class RenderWorkshopMenu(bpy.types.Panel):
                 "Scene_image_index",
                 type="DEFAULT",
             )
-            render_setting.separator()
             render_setting.prop(scene, "ShowImagePreview", text="Preview")
+            render_setting.separator()
+
             render_button = render_setting.row()
             render_button.operator(
                 RefreshSceneImageListOperator.bl_idname,
@@ -102,8 +103,6 @@ class RenderWorkshopMenu(bpy.types.Panel):
             )
 
         elif scene.TabIndex == "Animation":
-            render_setting = tab.column()
-
             render_setting.template_list(
                 "SCENE_ANIMATION_UL_scene_list",
                 "SceneAnimationItem",
@@ -113,7 +112,9 @@ class RenderWorkshopMenu(bpy.types.Panel):
                 "Scene_animation_index",
                 type="DEFAULT",
             )
-
+            render_setting.prop(
+                scene, "CheckMissFrames", text="Check missing frames and re-render it"
+            )
             render_setting.separator()
             render_button = render_setting.row()
             render_button.operator(
@@ -126,8 +127,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
                 text=RenderAnimatonOperator.bl_label,
                 icon="FILE_MOVIE",
             )
-        render_setting.enabled = True  # Toggle render protect
-
+        # render_setting.enabled = scene.RenderSettingEnable  # Toggle render protect
         layout.separator(type="LINE")
         message = layout.box()
 
@@ -153,6 +153,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
                 scene,
                 "Scene_Msg_index",
                 type="DEFAULT",
+                sort_lock=True,
             )
 
 
@@ -232,7 +233,6 @@ class Msg_list(bpy.types.UIList):
     ):
         row = layout.row(align=True)
         row.label(text=item.msg, translate=False)
-        
 
 
 class ClearMsgListOperator(bpy.types.Operator):
@@ -432,6 +432,9 @@ def register():
     )
     bpy.types.Scene.ShowImagePreview = bpy.props.BoolProperty(
         name="ImagePreview", default=True
+    )
+    bpy.types.Scene.CheckMissFrames = bpy.props.BoolProperty(
+        name="Check missing frames", default=True
     )
     bpy.types.Scene.Scene_animation_list = bpy.props.CollectionProperty(
         type=SceneAnimationItem

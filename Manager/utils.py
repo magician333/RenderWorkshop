@@ -196,6 +196,48 @@ def manage_image_threads(
     bpy.app.timers.register(check_threads)
 
 
+def check_missing_frames(
+    server, workerlist, directory, start_frame, end_frame, scene_name, finish_callback
+):
+    missing_frames = []
+    for frame in range(start_frame, end_frame + 1):
+        filename = f"{frame}.png"
+        if not os.path.exists(os.path.join(directory, filename)):
+            missing_frames.append(frame)
+    if missing_frames:
+        msg(f"[Info] frames {missing_frames} are missing")
+        msg("[Info] re-render these frames")
+        new_tasks = []
+        current_start = missing_frames[0]
+        for i in range(1, len(missing_frames)):
+            if missing_frames[i] != missing_frames[i - 1] + 1:
+                current_end = missing_frames[i - 1]
+                new_tasks.append([current_start, current_end])
+                current_start = missing_frames[i]
+        new_tasks.append([current_start, missing_frames[-1]])
+        new_taskslist = []
+        for index, (start, end) in enumerate(new_tasks):
+            task = {
+                "index": index,
+                "border": [0, 1, 0, 1],
+                "worker": "",
+                "scene_name": scene_name,
+                "start_time": 0,
+                "end_time": 0,
+                "complete": RenderStatus.PENDING,
+                "lock": None,
+                "frame_range": [start, end],
+            }
+            new_taskslist.append(task)
+        manage_animation_threads(
+            server=server,
+            tasklist=new_taskslist,
+            workerlist=workerlist,
+            finish_callback=finish_callback,
+        )
+    return missing_frames
+
+
 def animation_task(server, worker, task):
     scene = bpy.context.scene
     renderfilepath = os.path.join(os.path.dirname(bpy.data.filepath), scene.name)
@@ -253,6 +295,19 @@ def manage_animation_threads(server, tasklist, workerlist, finish_callback):
         if any(thread.is_alive() for thread in threads):
             return 1.0
         bpy.context.scene.RenderSettingEnable = True
+
+        scene = bpy.context.scene
+        renderfilepath = os.path.join(os.path.dirname(bpy.data.filepath), scene.name)
+
+        check_missing_frames(
+            server=server,
+            workerlist=workerlist,
+            directory=renderfilepath,
+            start_frame=tasklist[0]["frame_range"][0],
+            end_frame=tasklist[-1]["frame_range"][1],
+            scene_name=tasklist[0]["scene_name"],
+            finish_callback=finish_callback,
+        )
         finish_callback()
         return None
 
