@@ -42,11 +42,15 @@ RenderWorkshop分为manager和worker两部分。
 ### 对于图像
 manager获取需要渲染的文件并计算区域渲染的分块（tiles），制定区域渲染的渲染任务，连接 worker 主机，并将任务分配给可用的 worker。
 worker负责渲染manager分发的区域渲染任务，并在渲染完成后将任务发送给manager，然后 “领取 ”下一个任务。
-图像的所有区域渲染完成后，manager会使用 blender 合成器将所有分区合并成完整的图像。
+图像的所有区域渲染完成后，manager会使用blender合成器将所有分区合并成完整的图像。
 
-### 图像序列（视频）
-1. 您可以选择为不同的worker设置不同的帧范围，类似于 [Flamenco](https://flamenco.blender.org/)。
+![interpret_image](/img/interpret_image_cn.png)
+### 对于图像序列（视频）
+设置需要渲染的帧范围和拆分数量，manager将会自动将帧范围拆分成不同的区间，分配给不同的worker渲染。
+worker负责渲染manager分发的帧区间渲染任务。
+类似于 [Flamenco](https://flamenco.blender.org/)。
 
+![interpret_animation](/img/interpret_animation_cn.png)
 
 开发进度
 ---
@@ -68,7 +72,6 @@ worker负责渲染manager分发的区域渲染任务，并在渲染完成后将�
  - [ ] 多平台blender测试（当前基于Windows）
  - [ ] 多版本blender渲染测试（当前基于blender4.2.1）
  - [ ] 代码优化
- - [ ] 多语言支持
 
 
 其他

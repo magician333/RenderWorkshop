@@ -56,8 +56,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
         net_row.label(text="Local IP: " + ip)
         net_row.label(text="Port: " + str(context.scene.ServerPort))
         server_box.label(text=context.scene.ServerStatus)
-        layout.separator()
-        layout.template_list(
+        server_box.template_list(
             "WorkerItemList",
             "Workers_list",
             scene,
@@ -68,6 +67,9 @@ class RenderWorkshopMenu(bpy.types.Panel):
         )
 
         layout.separator(type="LINE")
+        render_head = layout.row()
+        render_head.label(icon="RENDER_STILL")
+        render_head.label(text="Render")
 
         tab = layout.column().box()
         tabrow = tab.row()
@@ -76,7 +78,6 @@ class RenderWorkshopMenu(bpy.types.Panel):
 
         if scene.TabIndex == "Image":
             render_setting = tab.column()
-            render_setting.prop(scene, "ShowImagePreview", text="Preview")
             render_setting.template_list(
                 "SCENE_IMAGE_UL_scene_list",
                 "",
@@ -87,6 +88,7 @@ class RenderWorkshopMenu(bpy.types.Panel):
                 type="DEFAULT",
             )
             render_setting.separator()
+            render_setting.prop(scene, "ShowImagePreview", text="Preview")
             render_button = render_setting.row()
             render_button.operator(
                 RefreshSceneImageListOperator.bl_idname,
@@ -113,7 +115,6 @@ class RenderWorkshopMenu(bpy.types.Panel):
             )
 
             render_setting.separator()
-
             render_button = render_setting.row()
             render_button.operator(
                 RefreshSceneImageListOperator.bl_idname,
@@ -221,7 +222,7 @@ class DeleteHostOperator(bpy.types.Operator):
 
 class MsgItem(bpy.types.PropertyGroup):
     msg: bpy.props.StringProperty(
-        name="Render Message", description="Show Render Message"
+        name="Render Message",
     )  # type: ignore
 
 
@@ -231,6 +232,7 @@ class Msg_list(bpy.types.UIList):
     ):
         row = layout.row(align=True)
         row.label(text=item.msg, translate=False)
+        
 
 
 class ClearMsgListOperator(bpy.types.Operator):
@@ -254,7 +256,7 @@ class DisplayMsgListOperator(bpy.types.Operator):
 
 class RefreshSceneImageListOperator(bpy.types.Operator):
     bl_idname = "render.refresh_image_scene"
-    bl_label = "Refresh Scene"
+    bl_label = "Refresh"
 
     def has_camera(self, scene):
         for obj in scene.objects:
@@ -338,7 +340,7 @@ class SCENE_ANIMATION_UL_scene_list(bpy.types.UIList):
         row.label(text=item.scene_name, translate=False)
         row.prop(item, "frame_start", text="Start")
         row.prop(item, "frame_end", text="End")
-        row.prop(item, "frame_split", text="Frame Split")
+        row.prop(item, "frame_split", text="Split")
         row.enabled = item.enabled
 
 
@@ -420,9 +422,7 @@ def register():
     bpy.utils.register_class(SCENE_ANIMATION_UL_scene_list)
 
     bpy.types.Scene.Scene_Msg_list = bpy.props.CollectionProperty(type=MsgItem)
-    bpy.types.Scene.Scene_Msg_index = bpy.props.IntProperty(
-        name="Render Message", description="Show render message"
-    )
+    bpy.types.Scene.Scene_Msg_index = bpy.props.IntProperty(name="Render Message")
     bpy.types.Scene.Display_Msg_list = bpy.props.BoolProperty(
         name="Display Message", default=True
     )

@@ -13,6 +13,11 @@ class RenderStatus(Enum):
     COMPLETED = auto()
 
 
+def msg(message):
+    item = bpy.context.scene.Scene_Msg_list.add()
+    item.msg = message
+
+
 def getborders(num):
     scene = bpy.context.scene
     width = scene.render.resolution_x
@@ -29,11 +34,29 @@ def getborders(num):
     return borders
 
 
+def worker_thread(server, area, tasklist, worker, method):
+    while any(task["complete"] != RenderStatus.COMPLETED for task in tasklist):
+        if worker["render"] and worker["online"]:
+            for task in tasklist:
+                if task["complete"] == RenderStatus.PENDING and task["lock"] is None:
+                    if worker.get("task_lock", None) is None:
+                        worker["task_lock"] = threading.Lock()
+                    with worker["task_lock"]:
+                        if task["lock"] is None:
+                            task["lock"] = worker["host"]
+                            task["complete"] = RenderStatus.RENDERING
+                            if method == "image":
+                                image_task(server, area, task, worker)
+                            else:
+                                animation_task(server, worker, task)
+                            break
+        time.sleep(0.1)
+
+
 def merge_image(area, outputfilepath, outputfilename):
     tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
     if not os.path.exists(tempfilepath):
-        item = bpy.context.scene.Scene_Msg_list.add()
-        item.msg = "[Error] temp path error"
+        msg("[Error] temp path error")
         return
 
     images = []
@@ -41,7 +64,7 @@ def merge_image(area, outputfilepath, outputfilename):
         if i.endswith(".png"):
             tmpfile = os.path.join(tempfilepath, i)
             images.append(bpy.data.images.load(tmpfile))
-
+    msg(f"[Info] start merge image {outputfilename}")
     scene = bpy.context.scene
     bpy.context.scene.use_nodes = True
     tree = bpy.context.scene.node_tree
@@ -57,6 +80,7 @@ def merge_image(area, outputfilepath, outputfilename):
         input_image.image = image
         input_nodes.append(input_image)
     result_image = input_nodes[0]
+
     for i in range(1, len(input_nodes)):
         merge_node = tree.nodes.new(type="CompositorNodeAlphaOver")
         links.new(result_image.outputs[0], merge_node.inputs[1])
@@ -71,9 +95,12 @@ def merge_image(area, outputfilepath, outputfilename):
     scene.render.use_border = False
     bpy.ops.render.render(write_still=True)
 
+    msg(f"[Info] merge {outputfilename} success")
+
     for n in tree.nodes:
         tree.nodes.remove(n)
     bpy.context.scene.use_nodes = False
+
     if area:
         image = bpy.data.images.load(composite_file_path)
         area.spaces.active.image = image
@@ -81,8 +108,9 @@ def merge_image(area, outputfilepath, outputfilename):
 
 def image_task(server, area, task, worker):
     if worker["render"] and worker["online"]:
-        item = bpy.context.scene.Scene_Msg_list.add()
-        item.msg = f"{worker['host']} is rendering tile {task['index']}"
+        msg(
+            f"[Info] {worker['host']} rendering {task['scene_name']}-{task['index']} start"
+        )
         send_data = {
             "flag": "sync",
             "blend_file": worker["blendfile"],
@@ -118,31 +146,14 @@ def image_task(server, area, task, worker):
                 task["end_time"] = time.time()
                 worker["render"] = True
                 task["complete"] = RenderStatus.COMPLETED
+                msg(
+                    f"[Info] {worker['host']} rendering {task['scene_name']}-{task['index']} complete, cost {round(task['end_time']-task['start_time'],2)}s"
+                )
         except Exception as e:
             worker["online"] = False
-            item = bpy.context.scene.Scene_Msg_list.add()
-            item.msg = f"[Error] task run error: {e}"
+            msg(f"[Error] task run error: {e}")
         finally:
             task["lock"] = None
-
-
-def worker_thread(server, area, tasklist, worker, method):
-    while any(task["complete"] != RenderStatus.COMPLETED for task in tasklist):
-        if worker["render"] and worker["online"]:
-            for task in tasklist:
-                if task["complete"] == RenderStatus.PENDING and task["lock"] is None:
-                    if worker.get("task_lock", None) is None:
-                        worker["task_lock"] = threading.Lock()
-                    with worker["task_lock"]:
-                        if task["lock"] is None:
-                            task["lock"] = worker["host"]
-                            task["complete"] = RenderStatus.RENDERING
-                            if method == "image":
-                                image_task(server, area, task, worker)
-                            else:
-                                animation_task(server, worker, task)
-                            break
-        time.sleep(0.1)
 
 
 def manage_image_threads(
@@ -191,8 +202,9 @@ def animation_task(server, worker, task):
 
     if not os.path.exists(renderfilepath):
         os.mkdir(renderfilepath)
-    item = bpy.context.scene.Scene_Msg_list.add()
-    item.msg = f"{worker['host']} is rendering"
+    msg(
+        f"[Info] {worker['host']} render {task['scene_name']}-{task['frame_range']} start"
+    )
     send_data = {
         "flag": "sync",
         "blend_file": worker["blendfile"],
@@ -217,12 +229,12 @@ def animation_task(server, worker, task):
             task["end_time"] = time.time()
             task["complete"] = RenderStatus.COMPLETED
             worker["render"] = True
-            item = bpy.context.scene.Scene_Msg_list.add()
-            item.msg = f"[Info] {worker['host']} render image success"
+            msg(
+                f"[Info] {worker['host']} render {task['scene_name']}-{task['frame_range']} complete,cost {round(task['end_time']-task['start_time'],2)}s"
+            )
     except Exception as e:
         worker["online"] = False
-        item = bpy.context.scene.Scene_Msg_list.add()
-        item.msg = f"[Error] Task run error: {e}"
+        msg(f"[Error] task run error: {e}")
     finally:
         task["lock"] = None
 
@@ -242,45 +254,6 @@ def manage_animation_threads(server, tasklist, workerlist, finish_callback):
             return 1.0
         bpy.context.scene.RenderSettingEnable = True
         finish_callback()
-        return None
-
-    bpy.app.timers.register(check_threads)
-
-
-def manage_animation_tiles_threads(
-    server,
-    area,
-    tasklist,
-    workerlist,
-    outputfilepath,
-    outputfilename,
-    rendering,
-):
-    threads = []
-    tempfilepath = os.path.join(os.path.dirname(bpy.data.filepath), "temp")
-    if os.path.exists(tempfilepath):
-        shutil.rmtree(tempfilepath)
-        os.mkdir(tempfilepath)
-    else:
-        os.mkdir(tempfilepath)
-    for worker in workerlist:
-        thread = threading.Thread(
-            target=worker_thread, args=(server, area, tasklist, worker, "image")
-        )
-        thread.start()
-        threads.append(thread)
-
-    def check_threads():
-        nonlocal rendering
-        if any(thread.is_alive() for thread in threads):
-            return 1.0
-        if rendering:
-            merge_image(
-                area, outputfilepath=outputfilepath, outputfilename=outputfilename
-            )
-            shutil.rmtree(tempfilepath)
-            bpy.context.scene.RenderSettingEnable = True
-            rendering = False
         return None
 
     bpy.app.timers.register(check_threads)
@@ -327,7 +300,7 @@ def render_image(context, server, area, scene_name, frame, tiles, callback):
     )
 
 
-def render_animation_frame(
+def render_animation(
     context, server, scene_name, start_frame, end_frame, step, callback
 ):
     tasklist = []
@@ -370,80 +343,6 @@ def render_animation_frame(
     )
 
 
-def render_animation_tiles(context, server, start_frame, end_frame, render_finish):
-    tasklist = []
-    for index, border in enumerate(getborders(context.scene.Tiles)):
-        task = {
-            "index": index,
-            "border": border,
-            "worker": "",
-            "start_time": 0,
-            "end_time": 0,
-            "complete": RenderStatus.PENDING,
-            "lock": None,
-            "frame": [context.scene.frame_current, context.scene.frame_current + 1],
-        }
-        tasklist.append(task)
-
-    workerlist = []
-    for item in context.scene.Workers_list:
-        worker = {
-            "host": item.host,
-            "render": True,
-            "online": True,
-            "blendfile": item.blendfile.strip('"'),
-        }
-        workerlist.append(worker)
-
-    bpy.ops.wm.window_new()
-    area = bpy.context.window_manager.windows[-1].screen.areas[0]
-    area.ui_type = "IMAGE_EDITOR"
-
-    outputfilepath = os.path.join(
-        os.path.dirname(bpy.data.filepath), context.scene.name
-    )
-
-    if not os.path.exists(outputfilepath):
-        os.mkdir(outputfilepath)
-
-    rendering = False
-
-    def render_frame(frame):
-        nonlocal rendering
-        if not rendering:
-            context.scene.RenderSettingEnable = False
-            outputfilename = f"{frame:04}.png"
-            rendering = True
-
-            manage_animation_tiles_threads(
-                server=server,
-                area=area,
-                tasklist=tasklist,
-                workerlist=workerlist,
-                outputfilepath=outputfilepath,
-                outputfilename=outputfilename,
-                rendering=rendering,
-                render_finish=render_finish,
-            )
-
-    def check_rendering():
-        nonlocal current_frame, rendering
-        if current_frame <= end_frame and not rendering:
-
-            def render_finish():
-                nonlocal current_frame
-                bpy.app.timers.register(render_frame(current_frame))
-
-            render_frame(current_frame, render_finish)
-            current_frame += 1
-            return 0.1
-        else:
-            return None
-
-    current_frame = start_frame
-    bpy.app.timers.register(check_rendering)
-
-
 def process_scene_list(context, server, area, method):
     if "image" == method:
         scene_items = context.scene.Scene_image_list
@@ -471,7 +370,7 @@ def process_scene_list(context, server, area, method):
                         callback=on_finish,
                     )
                 else:
-                    render_animation_frame(
+                    render_animation(
                         context,
                         server,
                         scene_name=item.scene_name,

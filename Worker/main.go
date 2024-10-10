@@ -3,14 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
-
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type Client struct {
@@ -116,7 +115,7 @@ func (c *Client) recv() {
 				if err := command.Run(); err == nil {
 					c.conn.Write([]byte(keyTime + ".png"))
 					endTime := time.Now().Unix()
-					msg := fmt.Sprintf("[Info] success render temp image %s, border:%s, cost %d s", keyTime+".png", sliceToString(c.border), endTime-startTime)
+					msg := fmt.Sprintf("[Info] success render temp image, saved at %s, border:%s, cost:%d s", keyTime+".png", sliceToString(c.border), endTime-startTime)
 					fmt.Println(msg)
 				}
 
@@ -145,7 +144,7 @@ func (c *Client) recv() {
 						fmt.Println("[Error] ", err)
 					}
 					endTime := time.Now().Unix()
-					msg := fmt.Sprintf("[Info] success render frame %s, cost %d s", tempFilename, endTime-startTime)
+					msg := fmt.Sprintf("[Info] success render frame saved at %s, cost:%d s", tempFilename, endTime-startTime)
 					fmt.Println(msg)
 				}
 			}
